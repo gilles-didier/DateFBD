@@ -12,7 +12,7 @@ Software includes
 	draws a single tree with the fossil ages
 
 type
-	> make all
+	'> make all'
 	in a console opened on the src directory for compiling software.
 
 Directory "src" contains the C sources of software
@@ -148,12 +148,12 @@ DESCRIPTION
 		compute the divergence distribution associated to node <number>; option can be used several times; if it is not used all the divergence times are computed
 	-x <number>
 		set the graphic format of the output (option is required if one wants a graphic output)
-			-f 1 -> pdf
-			-f 2 -> postscript
-			-f 3 -> png
-			-f 4 -> svg
-			-f 5 -> LaTeX (psTricks)
-			-f 6 -> LaTeX (TikZ)
+			-x 1 -> pdf
+			-x 2 -> postscript
+			-x 3 -> png
+			-x 4 -> svg
+			-x 5 -> LaTeX (psTricks)
+			-x 6 -> LaTeX (TikZ)
 	-h
 		display help
 
@@ -265,12 +265,12 @@ DESCRIPTION
 		set the end time
 	-x <number>
 		set the graphic format of the output (option is required if one wants a graphic output)
-			-f 1 -> pdf
-			-f 2 -> postscript
-			-f 3 -> png
-			-f 4 -> svg
-			-f 5 -> LaTeX (psTricks)
-			-f 6 -> LaTeX (TikZ)
+			-x 1 -> pdf
+			-x 2 -> postscript
+			-x 3 -> png
+			-x 4 -> svg
+			-x 5 -> LaTeX (psTricks)
+			-x 6 -> LaTeX (TikZ)
 	-h
 		display help
 
