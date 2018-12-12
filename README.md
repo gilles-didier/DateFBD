@@ -12,7 +12,7 @@ Software includes
 	draws a single tree with the fossil ages
 
 type
-	'> make all'
+	'make all'
 	in a console opened on the src directory for compiling software.
 
 Directory "src" contains the C sources of software
