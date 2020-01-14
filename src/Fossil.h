@@ -69,6 +69,7 @@ double getMaxFossilTime(TypeFossilFeature* feat);
 void fixTreeBis(TypeTree *tree, TypeFossilFeature *fos);
 void fixTreeTer(TypeTree *tree, TypeFossilFeature *fos);
 void fillUnknownTimesFossil(double tmin, double tmax, TypeTree *tree,  TypeFossilFeature *fos);
+int checkConsistency(TypeFossilFeature *fp, int size);
 
 /*compare two fossils a and b with regard to their times*/
 int compareFossilList(const void* a, const void* b);

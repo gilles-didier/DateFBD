@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
-#include <pthread.h>
-#include <signal.h>
+#include <fenv.h>
+
 
 #include <gsl/gsl_rng.h>
 
@@ -14,8 +14,8 @@
 #include "FossilInt.h"
 #include "Model.h"
 #include "Uncertainty.h"
-#include "MinimizeNLOpt.h"
 #include "Distribution.h"
+#include "MCMCImportanceSampling.h"
 
 #ifdef DO_PS
 #endif
@@ -49,33 +49,17 @@
 
 
 
-typedef struct THREAD_PARAMETER {
-	int *number;
-	pthread_mutex_t *mutex_number;
-	pthread_cond_t *cond_number;
-	TypeTree *tree;
-	TypeFossilFeature *ffe;
-	int def, node;
-	double min, max, step;
-	TypeDistribution *logD;
-	double *logCond;
-	TypeModelParam *param;
-} TypeThreadParameter;
-
 
 static char **readList(FILE *f);
-static void *threadComputeDistribution(void *data);
 
 int main(int argc, char **argv) {	
 	char *inputFileNameTree, *inputFileNameList, *inputFileNameFossil = NULL, *outputPrefix = PREFIX, outputDistribution[STRING_SIZE], option[256];
 	FILE *fi, *fl, *ff, *fo;
-	int i, j, nSamp = 100, def, outDens = 1, maxT = 2;
-	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., maxTimeIntSup = 0., step = 0.1;
-	TypeModelParam param = {.birth=1.3, .death = 1., .fossil = 1., .sampling = 1.};
-	pthread_mutex_t mutexN = PTHREAD_MUTEX_INITIALIZER;
-	pthread_cond_t condN = PTHREAD_COND_INITIALIZER;
+	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, outDens = 1, maxT = 2;
+	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., step = 0.1, al = 0.75, prop = 0.25, probSpe = 0.33, probExt = 0.33;
+	TypeModelParam param = {.birth=1.3, .death = 1., .fossil = 1., .sampling = 1.}, windSize = {.birth=0.1, .death = 0.1, .fossil = 0.02, .sampling = 1.}, init = {.birth=0.5, .death = 0.5, .fossil = 0.1, .sampling = 1.};
 
-	
+//feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);	
 	for(i=0; i<256; i++)
 		option[i] = 0;
 	   
@@ -89,6 +73,7 @@ int main(int argc, char **argv) {
 				tree = readTree(fi);
 				toBinary(tree);
 				printTreeDebug(stdout, tree->root, tree, tree->name);
+//				bltoabsTime(tree);
 				reorderTree(tree->name, tree);
 				if(tree->minTime == NO_TIME || tree->minTime == 0.)
 					tree->minTime = tree->time[tree->root]*0.9;
@@ -99,7 +84,6 @@ int main(int argc, char **argv) {
 						if(tree->time[n]>tree->maxTime)
 							tree->maxTime = tree->time[n];
 				}
-				printTreeDebug(stdout, tree->root, tree, tree->name);
 			} else {
 				fprintf(stderr, "Error while reading %s.\n", argv[i]);
 				exit(1);
@@ -117,17 +101,6 @@ int main(int argc, char **argv) {
 			else
 				minTimeIntSup = NO_TIME;
 		}
-		if(option['e']) {
-			option['e'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%le", &maxTimeIntInf) == 1)
-				i++;
-			else
-				exitProg(ErrorArgument, "at least one value is expected after -o");
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &maxTimeIntSup) == 1)
-				i++;
-			else
-				maxTimeIntSup = maxTimeIntInf;
-		}
 		if(option['p']) {
 			option['p'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &(param.birth)) == 1)
@@ -144,6 +117,60 @@ int main(int argc, char **argv) {
 				exitProg(ErrorArgument, "3 values are expected after -p");
 
 		}
+		if(option['a']) {
+			option['a'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &probSpe) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "2 values are expected after -a");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &probExt) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "2 values are expected after -a");
+		}
+		if(option['w']) {
+			option['w'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &windSize.birth) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "3 values are expected after -w");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.death) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "3 values are expected after -w");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.fossil) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "3 values are expected after -w");
+		}
+		if(option['i']) {
+			option['i'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &init.birth) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "3 values are expected after -i");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.death) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "3 values are expected after -i");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.fossil) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "3 values are expected after -i");
+		}
+		if(option['r']) {
+			unsigned int seed;
+			option['r'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%u", &seed) == 1) {
+				srand(seed);
+				i++;
+			} else
+				exitProg(ErrorArgument, "1 values are expected after -r");
+		}
+		if(option['d']) {
+			option['d'] = 0;
+			outDens = 0;
+		}
 		if(option['s']) {
 			option['s'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &nSamp) == 1)
@@ -151,9 +178,19 @@ int main(int argc, char **argv) {
 			else
 				exitProg(ErrorArgument, "a number is expected after -s");
 		}
-		if(option['d']) {
-			option['d'] = 0;
-			outDens = 0;
+		if(option['b']) {
+			option['b'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%d", &nBurn) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "a number is expected after -b");
+		}
+		if(option['g']) {
+			option['g'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%d", &nGap) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "a number is expected after -b");
 		}
 		if(option['u']) {
 			option['u'] = 0;
@@ -169,11 +206,24 @@ int main(int argc, char **argv) {
 			else
 				exitProg(ErrorArgument, "a number is required after option -t");
 		}
+		if(option['f']) {
+			option['f'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &prop) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "a number is required after option -t");
+		}
 		if(option['h']) {
 			option['h'] = 0;
 			printf("%s\n", HELPMESSAGE);
 			exit(0);
 		}
+	}
+	if(i<argc) {
+		inputFileNameList = argv[i++];
+	} else {
+		fprintf(stderr, "Please provide the name of a file containing a list of leaf names\n");
+		exit(1);
 	}
 	if(i<argc) {
 		inputFileNameTree = argv[i++];
@@ -187,21 +237,14 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Please provide the name of a file containing a fossil list\n");
 		exit(1);
 	}
-	if(i<argc) {
-		inputFileNameList = argv[i++];
-	} else {
-		fprintf(stderr, "Please provide the name of a file containing a list of leaf names of a clade\n");
-		exit(1);
-	}
 	if(i<argc)
 		outputPrefix = argv[i++];
 	if((fi = fopen(inputFileNameTree, "r")) && (fl = fopen(inputFileNameList, "r")) && (ff = fopen(inputFileNameFossil, "r"))) {
 		TypeTree **tree;
 		char **list;
 		TypeFossilIntFeature **fos;
-		TypeDistribution *logD, dist;
-		double *logCond, min, max;
-		int i, n, sizeTree, s, *node, nT, cont;
+		TypeDistribution dist;
+		int i, sizeTree, *node;
 		gsl_rng *rg = gsl_rng_alloc(gsl_rng_random_glibc2);
 		
 		list = readList(fl);
@@ -236,12 +279,13 @@ int main(int argc, char **argv) {
 				sizeTree++;
 			}
 		}
+
+ 
+
 		if(sizeTree == 0) {
 			fprintf(stderr, "Error: no tree (size)\n");
 			exit(0);
 		}
-		logD = (TypeDistribution*) malloc(nSamp*sizeof(TypeDistribution));
-		logCond = (double*) malloc(nSamp*sizeof(double));
 		double minFossilTime = getMinFossilIntTime(fos[0]);
 		if(minTimeIntInf == NO_TIME || minTimeIntInf > minFossilTime) {
 			if(minFossilTime<0)
@@ -249,118 +293,20 @@ int main(int argc, char **argv) {
 			else
 				minTimeIntInf = 0.8*minFossilTime;
 		}
-		min = minTimeIntInf;
-		max = getMinFossilIntTimeFromNode(node[0], tree[0], fos[0]);
-		min = floor(min/step)*step;
-		max = ceil(max/step)*step;
-		def = 1+round((max-min)/step);
-		s = 0;
-		nT = 0;
-		cont = 1;
-		while(cont) {
-			pthread_mutex_lock(&mutexN);
-			while(s < nSamp && nT < maxT) {
-				pthread_t thread;	
-				int ret = 0;
-				TypeFossilFeature *ffe;
-				TypeTree *treeTmp;
-				TypeThreadParameter *tp;
-				int it;
-fprintf(stdout, "\rSampling %d/%d", s, nSamp); fflush(stdout);
-				it = gsl_rng_uniform_int(rg, (unsigned long int) sizeTree);
-				treeTmp = cpyTree(tree[it]);
-				treeTmp->minTime = minTimeIntInf;
-				treeTmp->minTimeInt.inf = minTimeIntInf;
-				treeTmp->minTimeInt.sup = minTimeIntSup;
-				treeTmp->maxTime = maxTimeIntInf+gsl_rng_uniform(rg)*(maxTimeIntSup-maxTimeIntInf);
-				ffe = sampleFossilInt(fos[it], treeTmp->size);
-				for(n=0; n<treeTmp->size; n++) {
-					if(treeTmp->node[n].child == NOSUCH) {
-						int f;
-						double maxTmp;
-						switch(fos[it]->status[n]) {
-							case contempNodeStatus:
-								treeTmp->time[n] = treeTmp->maxTime;
-							break;
-							case unknownNodeStatus:
-								
-							break;
-							case extinctNodeStatus:
-								maxTmp = NEG_INFTY;
-								for(f=ffe->fossil[n]; f!=NOSUCH; f=ffe->fossilList[f].prec)
-									if(ffe->fossilList[f].time>maxTmp)
-										maxTmp = ffe->fossilList[f].time; 
-								treeTmp->time[n] = maxTmp;
-							break;
-							default:
-								fprintf(stderr, "Node %d has no status\n", n);
-								return 1;
-						}
-					} else
-						treeTmp->time[n] = NO_TIME;
-				}
-				logD[s].size = def;
-				logD[s].item = (TypeDistributionItem*) malloc(logD[s].size*sizeof(TypeDistributionItem));
-				tp = (TypeThreadParameter*) malloc(sizeof(TypeThreadParameter));
-				tp->tree = treeTmp;
-				tp->ffe = ffe;
-				tp->param = &param;
-				tp->min = min;
-				tp->max = max;
-				tp->step = step;
-				tp->def = def;
-				tp->node = node[it];
-				tp->logD = &(logD[s]);
-				tp->logCond = &(logCond[s]);
-				tp->mutex_number = &mutexN;
-				tp->cond_number = &condN;
-				tp->number = &nT;
-				if((ret = pthread_create(&thread, NULL, threadComputeDistribution, (void*) tp)) == 0) {
-					int err;
-					if((err = pthread_detach(thread)) == 0) {
-						nT++; s++;
-					} else {
-						fprintf (stderr, "Error %d while detaching thread: %s\n", err, (char*) strerror(err));
-					}
-				} else
-					fprintf (stderr, "Error %d while creating thread: %s\n", ret, (char*) strerror(ret));
-			}
-			cont = (nT > 0);
-			if(cont)
-				pthread_cond_wait(&condN, &mutexN);
-			pthread_mutex_unlock(&mutexN);
+		for(i=0; i<sizeTree; i++) {
+			tree[i]->minTime = minTimeIntInf;
+			tree[i]->minTimeInt.inf = minTimeIntInf;
+			tree[i]->minTimeInt.sup = minTimeIntSup;
+			tree[i]->maxTime = maxTimeIntInf;
 		}
-		double sumCond, logSumCond, offset;
-		offset = logCond[0];
-		sumCond = 1.;
-		for(s=1; s<nSamp; s++)
-			if(!(isinf(logCond[s]) || isnan(logCond[s]))) {
-				if(logCond[s]>offset) { /*compute max in offset just to avoid numerical precision issues*/
-					sumCond *= exp(offset-logCond[s]);
-					offset = logCond[s];
-					sumCond++;
-				} else
-					sumCond += exp(logCond[s]-offset);
-			}
-		logSumCond = log(sumCond)+offset;
-		dist.size = def;
-		dist.item = (TypeDistributionItem*) malloc(dist.size*sizeof(TypeDistributionItem));
-		for(i=0; i<dist.size; i++) {
-			double sumI;
-			dist.item[i].val = min + i*step;
-			offset = logD[0].item[i].dens;
-			sumI = 1.;
-			for(s=1; s<nSamp; s++) {
-				if(!(isinf(logD[s].item[i].dens) || isnan(logD[s].item[i].dens))) {
-					if(logD[s].item[i].dens>offset) { /*compute max in offset just to avoid numerical precision issues*/
-						sumI *= exp(offset-logD[s].item[i].dens);
-						offset = logD[s].item[i].dens;
-						sumI++;
-					} else
-						sumI += exp(logD[s].item[i].dens-offset);
-				}
-			}
-			dist.item[i].dens = exp(log(sumI)+offset-logSumCond);
+		FILE *fout, *find;
+		char nameOutput[STRING_SIZE], nameIndex[STRING_SIZE];
+		sprintf(nameOutput, "%s.out", outputPrefix);
+		sprintf(nameIndex, "%s.ind", outputPrefix);
+		if((fout = fopen(nameOutput, "w")) && (find = fopen(nameIndex, "w"))) {
+			dist = MCMCSamplingDist(fout, find, tree, sizeTree, node, fos, step, al, nBurn, nGap, nSamp, prop, &windSize, &init, probSpe, probExt);
+			fclose(fout);
+			fclose(find);
 		}
 		sprintf(outputDistribution, "%s.csv", outputPrefix);
 		if((fo = fopen(outputDistribution, "w"))) {
@@ -373,9 +319,6 @@ fprintf(stdout, "\rSampling %d/%d", s, nSamp); fflush(stdout);
 		}
 		if(dist.item != NULL)
 			free((void*)dist.item);
-		for(s=0; s<nSamp; s++)
-			if(logD[s].item != NULL)
-				free((void*)logD[s].item);
 		gsl_rng_free(rg);
 		free((void*)node);
 	} else {
@@ -383,21 +326,6 @@ fprintf(stdout, "\rSampling %d/%d", s, nSamp); fflush(stdout);
 		exit(1);
 	}
 	return 0;
-}
-
-void *threadComputeDistribution(void *data) {
-	int i;
-	for(i=0; i<((TypeThreadParameter*)data)->logD->size; i++)
-		((TypeThreadParameter*)data)->logD->item[i].val = ((TypeThreadParameter*)data)->min + i*((TypeThreadParameter*)data)->step;
-	fillLogDistribution(((TypeThreadParameter*)data)->logD, ((TypeThreadParameter*)data)->logCond, ((TypeThreadParameter*)data)->node, ((TypeThreadParameter*)data)->tree, ((TypeThreadParameter*)data)->ffe, ((TypeThreadParameter*)data)->param);
-	freeTree(((TypeThreadParameter*)data)->tree);
-	freeFossilFeature(((TypeThreadParameter*)data)->ffe);
-	pthread_mutex_lock(((TypeThreadParameter*)data)->mutex_number);
-		(*((TypeThreadParameter*)data)->number)--;
-		pthread_cond_signal(((TypeThreadParameter*)data)->cond_number);
-	pthread_mutex_unlock(((TypeThreadParameter*)data)->mutex_number);
-	free(data);
-	return NULL;
 }
 
 #define MAX_SIZE_TMP 50

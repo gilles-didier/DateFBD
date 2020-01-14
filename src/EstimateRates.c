@@ -12,12 +12,10 @@
 
 #include "Utils.h"
 #include "Tree.h"
-#include "SimulTree.h"
 #include "Fossil.h"
 #include "FossilInt.h"
 #include "Model.h"
 #include "Uncertainty.h"
-#include "SimulFossil.h"
 #include "MinimizeNLOpt.h"
 
 

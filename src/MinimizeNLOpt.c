@@ -32,6 +32,14 @@ static double toMinimizeEventList(unsigned n, const double *x, double *grad, voi
 static double toMinimizeEventListFossilFixed(unsigned n, const double *x, double *grad, void *data);
 static double ratesConstraint(unsigned n, const double *x, double *grad, void *data);
 
+typedef struct MINIMIZATION_SET_TREE_FOS_DATA {
+    TypeTree **tree;
+    TypeFossilIntFeature **fos;
+    int nTree;
+    void *data;
+    TypeLikelihoodSetTreeFosFunction *likelihood;
+} TypeMinimizationSetTreeFossilData;
+
 typedef struct MINIMIZATION_TREE_FOS_DATA {
     TypeTree *tree;
     TypeFossilFeature *fos;
@@ -125,6 +133,19 @@ void sprintNLoptOption(char *buffer, TypeNLOptOption *option) {
     buffer += sprintf(buffer, "Optimizer runs %d trials and stops with tolerance %.lE or after more than %d iterations.\n", option->trials, option->tolOptim, option->maxIter);
 }
 
+double toMinimizeSetTreeFossil(unsigned n, const double *x, double *grad, void *data) {
+    TypeModelParam param;
+    double tmp;
+    param.birth = x[0];
+    param.death = x[1];
+    param.fossil = x[2];
+    param.sampling = 1.;
+    tmp = -((TypeMinimizationSetTreeFossilData*)data)->likelihood(((TypeMinimizationSetTreeFossilData*)data)->tree, ((TypeMinimizationSetTreeFossilData*)data)->nTree, ((TypeMinimizationSetTreeFossilData*)data)->fos, &param, ((TypeMinimizationSetTreeFossilData*)data)->data);
+ printf("%.4le %.4le %.4le\t %le\n", x[0], x[1], x[2], tmp);
+	return tmp;
+//    return -((TypeMinimizationSetTreeFossilData*)data)->likelihood(((TypeMinimizationSetTreeFossilData*)data)->tree, ((TypeMinimizationSetTreeFossilData*)data)->nTree, ((TypeMinimizationSetTreeFossilData*)data)->fos, &param, ((TypeMinimizationSetTreeFossilData*)data)->data);
+}
+
 double toMinimizeTreeFossil(unsigned n, const double *x, double *grad, void *data) {
     TypeModelParam param;
     param.birth = x[0];
@@ -160,10 +181,92 @@ double toMinimizeEventListFossilFixed(unsigned n, const double *x, double *grad,
 }
 
 double ratesConstraint(unsigned n, const double *x, double *grad, void *data) {
-//	fprintf(stderr, "constraint %.2le\n", x[1]-x[0]);
+//	fprintf(stderr, "constraint %.4le\n", x[1]-x[0]);
 	return x[1]-x[0];
 }
 
+int minimizeBirthDeathFossilFromSetTreeFossil(TypeLikelihoodSetTreeFosFunction *f, TypeTree **tree, int nTree, TypeFossilIntFeature **fos, void *likedata, TypeNLOptOption *option, TypeEstimation *estim) {
+    double lb[3], lu[3], x[3], minLikelihood;
+    nlopt_opt opt;
+    TypeMinimizationSetTreeFossilData data;
+    int result, t;
+fprintNLoptOptionTag(stdout, option);
+printf("\n");
+    data.tree = tree;
+    data.nTree = nTree;
+	data.fos = fos;
+	data.data = likedata;
+    data.likelihood = f;
+    lb[0] = 0.;
+    lb[1] = 0.;
+    lb[2] = 0.;
+    lu[0] = option->supSpe;
+    lu[1] = option->supExt;
+    lu[2] = option->supFos;
+    opt = nlopt_create(NLOPT_ALGO, 3); /* algorithm and dimensionality */
+	nlopt_add_inequality_constraint(opt, ratesConstraint, NULL, 1e-8);
+    nlopt_set_lower_bounds(opt, lb);
+    nlopt_set_upper_bounds(opt, lu);
+    nlopt_set_min_objective(opt, toMinimizeSetTreeFossil, &data);
+    nlopt_set_xtol_abs1(opt, option->tolOptim);
+    nlopt_set_maxeval(opt, option->maxIter);
+    estim->logLikelihood = INFTY;
+    for(t=0; t<option->trials; t++) {
+        x[1] = option->infExt+UNIF_RAND*(option->supExt-option->infExt);
+        x[0] = x[1]+UNIF_RAND*(option->supSpe-x[1]);
+        x[2] = option->infFos+UNIF_RAND*(option->supFos-option->infFos);
+printf("\n\nTrial %d start %.4le %.4le %.4le\n", t, x[0], x[1], x[2]);
+        if(((result = nlopt_optimize(opt, x, &minLikelihood)) >= 0) && minLikelihood < estim->logLikelihood) {
+            estim->logLikelihood = minLikelihood;
+            estim->param.birth = x[0];
+            estim->param.death = x[1];
+            estim->param.fossil = x[2];
+printf("Trial %d result (%d) %.4le %.4le %.4le\t%le\n", t, result, x[0], x[1], x[2], minLikelihood);
+        } else {
+			switch(result) {
+				case NLOPT_SUCCESS:
+					printf("Success\n");
+					break;
+				case NLOPT_STOPVAL_REACHED:
+					printf("Stop val reached\n");
+					break;
+				case NLOPT_FTOL_REACHED:
+					printf("Ftol reached\n");
+					break;
+				case NLOPT_XTOL_REACHED:
+					printf("Xtol reached\n");
+					break;
+				case NLOPT_MAXEVAL_REACHED:
+					printf("Max eval reached\n");
+					break;
+				case NLOPT_MAXTIME_REACHED:
+					printf("Max time reached\n");
+					break;
+				case NLOPT_FAILURE:
+					printf("General failure\n");
+					break;
+ 				case NLOPT_INVALID_ARGS:
+					printf("Invalid args\n");
+					break;
+  				case NLOPT_OUT_OF_MEMORY:
+					printf("Out of memory\n");
+					break;
+ 				case NLOPT_ROUNDOFF_LIMITED:
+					printf("Roundoff limited\n");
+					break;
+  				case NLOPT_FORCED_STOP:
+					printf("Forced stop\n");
+					break;
+				default:
+					printf("failure %d\n", result);
+			}
+printf("Trial %d result (%d) %.4le %.4le %.4le\t%le\n", t, result, x[0], x[1], x[2], minLikelihood);
+		}
+	}
+    estim->logLikelihood = -estim->logLikelihood;
+    nlopt_destroy(opt);
+    return result;
+}
 
 int minimizeBirthDeathFossilFromTreeFossil(TypeLikelihoodTreeFosFunction *f, TypeTree *tree, TypeFossilFeature *fos, TypeNLOptOption *option, TypeEstimation *estim) {
     double lb[3], x[3], minLikelihood;

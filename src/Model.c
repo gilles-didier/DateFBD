@@ -35,6 +35,46 @@ static double log_p0_Stadler(double t, double c1, double c2, TypeModelParam *par
 //static void splitTreeFossilModel(TypeTree *tree, TypeFossilFeature *fos, TypeTree ***treeList, int *size);
 
 
+TypePiecewiseModelParam simple2piecewise(TypeModelParam *param, double startTime, double endTime) {
+	TypePiecewiseModelParam res;
+	res.size = 1;
+	res.startTime = (double*) malloc(2*sizeof(double));
+	res.startTime[0] = startTime;
+	res.startTime[1] = endTime;
+	res.param = (TypeModelParam*) malloc(sizeof(TypeModelParam));
+	res.param[0] = *param;
+	return res;
+}
+
+int getPieceIndex(double v, TypePiecewiseModelParam *param) {
+	int a = 0, b = param->size, c;
+	if(v<param->startTime[0]) {
+		fprintf(stderr, "Error in 'getPieceIndex': value %.2lf too small (start time = %.2lf)\n", v, param->startTime[0]);
+		return 0;
+	}
+	if(v>param->startTime[param->size]) {
+		fprintf(stderr, "Error in 'getPieceIndex': value %.2lf too high (end time = %.2lf)\n", v, param->startTime[param->size]);
+		return param->size-1;
+	}
+	while(b > a+1) {
+		c = (a+b)/2;
+		if(param->startTime[c] < v)
+			a = c;
+		else
+			b = c;
+	}
+	return a;
+}
+			
+
+void printPiecewiseModel(FILE *f, TypePiecewiseModelParam *param) {
+	int i;
+	fprintf(f, "size %d\n", param->size);
+	for(i=0; i<param->size; i++)
+		fprintf(f, "%lf\n%lf %lf %lf %lf\n", param->startTime[i], param->param[i].birth, param->param[i].death, param->param[i].fossil, param->param[i].sampling);
+	fprintf(f, "%lf\n", param->startTime[param->size]);
+}
+
 TypeModelCoeffFBD getModelCoeffFBD(TypeModelParam *param) {
 	TypeModelCoeffFBD res;
 	res.birth = param->birth;

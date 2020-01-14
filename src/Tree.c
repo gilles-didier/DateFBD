@@ -66,7 +66,7 @@ int compareTmpReorderSize(const void *a, const void *b) {
 
 void reorderTreeSizeRec(int *tmp, int n, TypeTree *tree) {
     int c, nchild = 0;
-    for(c=tree->node[n].child; c>=0; c=tree->node[c].sibling) {
+    for(c=tree->node[n].child; c!=NOSUCH; c=tree->node[c].sibling) {
         nchild++;
         reorderTreeSizeRec(tmp, c, tree);
     }
@@ -75,7 +75,7 @@ void reorderTreeSizeRec(int *tmp, int n, TypeTree *tree) {
         TypeTmpReorderSize *tab;
         tab = (TypeTmpReorderSize*) malloc(nchild*sizeof(TypeTmpReorderSize));
         nchild = 0;
-        for(c=tree->node[n].child; c>=0; c=tree->node[c].sibling) {
+        for(c=tree->node[n].child; c!=NOSUCH; c=tree->node[c].sibling) {
             tab[nchild].size = tmp[c];
             tab[nchild].index = c;
             nchild++;
@@ -111,7 +111,7 @@ int addLeavesNames(int n, TypeLexiTree *dictClad, TypeLexiTree *dictSub, int *in
 	if(tree->node[n].child == NOSUCH) {
 		if(tree->name == NULL || tree->name[n] == NULL)
 			return 0;
-printf("add '%s'\n", tree->name[n]);
+//printf("add '%s'\n", tree->name[n]);
 		if((findWordLexi(tree->name[n], dictClad) == NOSUCH) || (addWordLexi(tree->name[n], (*ind)++, dictSub) != NOSUCH)) {
 			return 0;
 		}
@@ -1008,8 +1008,8 @@ void setTree(int n, TypeTree *dest, int m, TypeTree *src) {
 
 /*initialize fields of node to standard values*/
 void initNode(TypeNode *node) {
-    node->child = -1;
-    node->sibling = -1;
+    node->child = NOSUCH;
+    node->sibling = NOSUCH;
 }
 
 /*print tree in debug mode*/
@@ -1179,16 +1179,14 @@ TypeTree **readTrees(FILE *f) {
         }
         skipSeparator(f);
         c = fgetc(f);
-         if(c != ';') {
+         if(c != ';')
             freeTree(tree[size]);
-         } else {
+         else
             size++;
-        }
        skipSeparator(f);
     } while(c != EOF);
     tree = realloc((void*) tree, (size+1)*sizeof(TypeTree*));
     tree[size] = NULL;
-       fprintTreeNewick(stdout, tree[0]);
     return tree;
 }
 
@@ -1746,7 +1744,7 @@ void printNodeDebug(FILE *f, int s, int depth, TypeTree *tree, char **name) {
             fprintf(f, "%s/%d", name[s], s);
         else
             fprintf(f, "%d", s);
-        if(tree->time[s] != NEG_INFTY)
+        if(tree->time[s] != NEG_INFTY && tree->time[s] != NO_TIME)
             fprintf(f, " %.2lf\n", tree->time[s]);
         else
             fprintf(f, " -\n");
@@ -1755,3 +1753,75 @@ void printNodeDebug(FILE *f, int s, int depth, TypeTree *tree, char **name) {
         printNodeDebug(f, tmp, depth+1, tree, name);
 }
 
+/*for all nodes n, index[n] is the new index of node n.
+ * It does not handle 'info'*/
+void reindexTree(TypeTree *tree, int *index) {
+    TypeNode *newnode;
+    int n, *newparent;
+    double *newtime;
+    char **newname, **newcomment;
+	
+	newnode = (TypeNode*) malloc(tree->sizeBuf*sizeof(TypeNode));
+	if(tree->time != NULL)
+		newtime = (double*) malloc(tree->sizeBuf*sizeof(double));
+	else
+		newtime = NULL;
+	if(tree->parent != NULL)
+		newparent = (int*) malloc(tree->sizeBuf*sizeof(int));
+	else
+		newparent = NULL;
+	if(tree->name != NULL)
+		newname = (char**) malloc(tree->sizeBuf*sizeof(char*));
+	else
+		newname = NULL;
+	if(tree->comment != NULL)
+		newcomment = (char**) malloc(tree->sizeBuf*sizeof(char*));
+	else
+		newcomment = NULL;
+	for(n=0; n<tree->size; n++) {
+		if(tree->node[n].child != NOSUCH)
+			newnode[index[n]].child = index[tree->node[n].child];
+		else
+			newnode[index[n]].child = NOSUCH;
+		if(tree->node[n].sibling != NOSUCH)
+			newnode[index[n]].sibling = index[tree->node[n].sibling];
+		else
+			newnode[index[n]].sibling = NOSUCH;
+		if(tree->time != NULL)
+			newtime[index[n]] = tree->time[index[n]];
+		if(tree->parent != NULL)
+			newparent[index[n]] = tree->parent[index[n]];
+		if(tree->name != NULL)
+			newname[index[n]] = tree->name[index[n]];
+		if(tree->comment != NULL)
+			newcomment[index[n]] = tree->comment[index[n]];
+	}
+	tree->root = index[tree->root];
+	free((void*)tree->node);
+	tree->node = newnode;
+	if(tree->time != NULL) {
+		free((void*)tree->time);
+		tree->time = newtime;
+	}
+	if(tree->parent != NULL) {
+		free((void*)tree->parent);
+		tree->parent = newparent;
+	}
+	if(tree->name != NULL) {
+		free((void*)tree->name);
+		tree->name = newname;
+	}
+	if(tree->comment != NULL) {
+		free((void*)tree->comment);
+		tree->comment = newcomment;
+	}
+}
+	
+/*fill the index in such a way that if c is a descendant of of n then index[c]>index[n]*/	
+void fillIndexTree(int n, int *cur, TypeTree *tree, int *index) {
+	int c;
+	index[n] = (*cur)++;
+	for(c=tree->node[n].child; c!=NOSUCH; c = tree->node[c].sibling)
+		fillIndexTree(c, cur, tree, index);
+}
+	

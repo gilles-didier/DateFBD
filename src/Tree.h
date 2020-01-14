@@ -204,6 +204,8 @@ void reallocTree(int sizeBuf, TypeTree *tree);
 char **newStringTab(int size);
 TypeTree **readTrees(FILE *f);
 void reorderTreeSize(TypeTree *tree);
+void reindexTree(TypeTree *tree, int *index);
+void fillIndexTree(int n, int *cur, TypeTree *tree, int *index);
 
 #ifdef __cplusplus
 }

@@ -1,18 +1,20 @@
 # list of executable files to produce
 DIST = dist
+DIAG = diag
 TREE = tree
 ESTI = esti
 DRAW = draw
 
 # .o files necessary to build the executables
-OBJ_DIST = Model.o TreeExtras.o Uncertainty.o Utils.o Tree.o Fossil.o FossilInt.o Distribution.o ComputeSampledDistributionThread.o
-OBJ_TREE = DrawDensity.o DrawFossilInt.o DrawTreeCairo.o DrawTreePSTricks.o DrawTreeTikz.o DrawTreeGeneric.o Model.o TreeExtras.o Uncertainty.o Utils.o Tree.o Fossil.o FossilInt.o Distribution.o ComputeSampledDistributionSingleTreeThread.o
-OBJ_ESTI = MinimizeNLOpt.o Model.o TreeExtras.o Uncertainty.o Utils.o Tree.o Fossil.o FossilInt.o  EstimateSampledThread.o 
+OBJ_DIST = MyError.o Model.o MCMCImportanceSampling.o TreeExtras.o Uncertainty.o Utils.o Tree.o Fossil.o FossilInt.o Distribution.o ComputeDistribution.o
+OBJ_DIAG = MyError.o Model.o MCMCImportanceSampling.o TreeExtras.o Uncertainty.o Utils.o Tree.o Fossil.o FossilInt.o Distribution.o ComputeDiagnosticMCMC.o
+OBJ_TREE = MyError.o Model.o MCMCImportanceSampling.o DrawDensity.o DrawFossilInt.o DrawTreeCairo.o DrawTreePSTricks.o DrawTreeTikz.o DrawTreeGeneric.o TreeExtras.o Uncertainty.o Utils.o Tree.o Fossil.o FossilInt.o Distribution.o ComputeDistributionSingleTree.o
+OBJ_ESTI = MyError.o MinimizeNLOpt.o Model.o TreeExtras.o Uncertainty.o Utils.o Tree.o Fossil.o FossilInt.o  EstimateRates.o 
 OBJ_DRAW = DrawFossilInt.o DrawTreeCairo.o DrawTreePSTricks.o DrawTreeTikz.o DrawTreeGeneric.o Utils.o Tree.o Fossil.o FossilInt.o DrawFossilTree.o
 
 ########### MODIFY ONLY TO CHANGE OPTIONS ############
 
-all = DIST TREE ESTI DRAW
+all = DIST DIAG TREE ESTI DRAW
 
 # compiler and its options
 CC = gcc
@@ -27,6 +29,10 @@ all: Makefile.d $(DIST) $(TREE) $(ESTI) $(DRAW)
 
 # build the executable
 $(DIST): $(OBJ_DIST)
+	$(LD) $^ -o $@ -L/usr/local/lib -L/usr/lib/ -lm -lgsl -lgslcblas -D_REENTRANT -L/usr/local/lib -L/usr/lib/ -lpthread  -O3
+
+# build the executable
+$(DIAG): $(OBJ_DIAG)
 	$(LD) $^ -o $@ -L/usr/local/lib -L/usr/lib/ -lm -lgsl -lgslcblas -D_REENTRANT -L/usr/local/lib -L/usr/lib/ -lpthread  -O3
 
 # build the executable

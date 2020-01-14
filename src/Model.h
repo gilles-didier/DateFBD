@@ -13,6 +13,12 @@ typedef struct MODEL_PARAM {
 	double birth, death, fossil, sampling;
 } TypeModelParam;
 
+typedef struct PIECEWISE_MODEL_PARAM {
+	int size;
+	double *startTime;
+	TypeModelParam *param;
+} TypePiecewiseModelParam;
+
 typedef struct EVENT {
 	char type;
 	int n;
@@ -32,8 +38,9 @@ typedef double TypeLikelihoodEventListFunction(TypeListEvent *, TypeModelParam *
 extern "C" {
 #endif
 
-
-
+TypePiecewiseModelParam simple2piecewise(TypeModelParam *param, double startTime, double endTime);
+int getPieceIndex(double v, TypePiecewiseModelParam *param);
+void printPiecewiseModel(FILE *f, TypePiecewiseModelParam *param);
 void getStatEvent(TypeListEvent *event, int *b,  int *d,  int *f);
 void freeListEvent(TypeListEvent *event);
 void fprintEvent(FILE *f, TypeEvent *event);

@@ -139,8 +139,12 @@ extern int DEBUGX;
 #define utils_MIN(x,y) ((x)<(y)?(x):(y))
 #define utils_ABS(x) ((x)<(0)?(-x):(x))
 #define POS(x) ((x)<(0)?(0):(x))
-#define NEG_INFTY -DBL_MAX
-#define POS_INFTY DBL_MAX
+//#define NEG_INFTY -DBL_MAX
+//#define POS_INFTY DBL_MAX
+//#define NEG_INFTY -1./0.
+//#define POS_INFTY 1./0.
+#define NEG_INFTY -INFINITY
+#define POS_INFTY INFINITY
 #define EPSILON 0.0000001
 //#define DEBUGX 0
 #define DEBUG(x) if(DEBUGX == 1) {x}

@@ -19,7 +19,10 @@ typedef struct PARAM_UNCERTAINTY {
 #ifdef __cplusplus
 extern "C" {
 #endif
+void testUncertainty(int k, int l, double tstartA, double tstartB, double tend, TypeModelParam *model);
 
+double getLogDensitySpecial(double time, int n, TypeTree *tree, TypeFossilFeature *fos, TypeModelParam *param);
+void fillLogDistributionSpecial(TypeDistribution *logD, int n, TypeTree *tree, TypeFossilFeature *fos, TypeModelParam *param);
 double getLogLikelihoodTreeFossilDebug(TypeTree *tree, TypeFossilFeature *fos, TypeModelParam *param);
 void splitTreeFossil(TypeTree *tree, TypeFossilFeature *fos, TypeTree ***treeList, int *size);
 double likelihood(double timeStart, double timeEnd, int nLeaves);

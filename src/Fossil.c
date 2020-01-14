@@ -8,6 +8,23 @@
 #define INC_FOSSIL_ITEM 50
 #define MAX_NAME_SIZE 3000
 
+int checkConsistency(TypeFossilFeature *fp, int size) {
+	int i, k;
+	for(i=0; i<size; i++) {
+		if(fp->fossil[i] != NOSUCH) {
+			double last = fp->fossilList[fp->fossil[i]].time;
+			for(k=fp->fossilList[fp->fossil[i]].prec; k!=NOSUCH; k=fp->fossilList[k].prec) {
+				if(last < fp->fossilList[k].time) {
+					printf("problem %.2lf %.2lf\n", last, fp->fossilList[k].time);
+					return 0;
+				}
+				last = fp->fossilList[k].time;
+			}
+		}
+	}
+	return 1;
+}
+		
 /*fully duplicate "feat"*/
 TypeFossilFeature *cpyFossilFeature(TypeFossilFeature *feat, int n) {
     TypeFossilFeature *res;
@@ -70,21 +87,33 @@ void freeFossilFeature(TypeFossilFeature *fos) {
 	free((void*)fos);
 }
 
-
 /*print fossilInt*/	
 void fprintFossilFeature(FILE *f, TypeFossilFeature *feat, char **name, int size) {
 	int i;
 	for(i=0; i<size; i++) {
-		if(feat->fossil[i]>=0) {
-			if(name != NULL && name[i] != NULL)
-				fprintf(f, "%s (%d)", name[i], i);
-			else
-				fprintf(f, "--- (%d)", i);
-			fprintFossilList(f, feat->fossil[i], feat->fossilList);
-			fprintf(f, "\n");
+		if(feat->fossil[i]!=NOSUCH) {
+			if(name != NULL && name[i] != NULL) {
+				fprintf(f, "%s", name[i]);
+				fprintFossilList(f, feat->fossil[i], feat->fossilList);
+				fprintf(f, "\n");
+			}
 		}
 	}
 }
+///*print fossilInt*/	
+//void fprintFossilFeature(FILE *f, TypeFossilFeature *feat, char **name, int size) {
+	//int i;
+	//for(i=0; i<size; i++) {
+		//if(feat->fossil[i]!=NOSUCH) {
+			//if(name != NULL && name[i] != NULL)
+				//fprintf(f, "%s (%d)", name[i], i);
+			//else
+				//fprintf(f, "--- (%d)", i);
+			//fprintFossilList(f, feat->fossil[i], feat->fossilList);
+			//fprintf(f, "\n");
+		//}
+	//}
+//}
 
 void fixTreeFossil(TypeTree *tree, TypeFossilFeature *fos) {
 	int n;
@@ -105,7 +134,7 @@ void fixTreeBis(TypeTree *tree, TypeFossilFeature *fos) {
         if(tree->node[n].child == NOSUCH && tree->time[n] == NO_TIME && fos->fossil[n] != NOSUCH) {
 			int f;
 			tree->time[n] = fos->fossilList[fos->fossil[n]].time;
-			for(f=fos->fossilList[fos->fossil[n]].prec; f>=0; f=fos->fossilList[f].prec)
+			for(f=fos->fossilList[fos->fossil[n]].prec; f!=NOSUCH; f=fos->fossilList[f].prec)
 				if(fos->fossilList[f].time>tree->time[n])
 					tree->time[n] = fos->fossilList[f].time;
 		}
@@ -120,7 +149,7 @@ void fixTreeTer(TypeTree *tree, TypeFossilFeature *fos) {
             if(fos->fossil[n] != NOSUCH) {
 				int f;
 				tree->time[n] = fos->fossilList[fos->fossil[n]].time;
-				for(f=fos->fossilList[fos->fossil[n]].prec; f>=0; f=fos->fossilList[f].prec)
+				for(f=fos->fossilList[fos->fossil[n]].prec; f!=NOSUCH; f=fos->fossilList[f].prec)
 					if(fos->fossilList[f].time>tree->time[n])
 						tree->time[n] = fos->fossilList[f].time;
 			} else {
@@ -133,7 +162,7 @@ void fixTreeTer(TypeTree *tree, TypeFossilFeature *fos) {
 /*print fossilInt table*/	
 void fprintFossilList(FILE *fo, int e, TypeFossilList *list) {
 	int f;
-	for(f=e; f>=0; f=list[f].prec)
+	for(f=e; f!=NOSUCH; f=list[f].prec)
 		fprintf(fo, "\t %lf", list[f].time);
 }
 
@@ -143,7 +172,7 @@ int countInternalFossils(double *time, TypeFossilFeature *fos, int size) {
 	int n, count = 0;
 	for(n=0; n<size; n++) {
 		int f;
-		for(f=fos->fossil[n]; f>=0; f = fos->fossilList[f].prec)
+		for(f=fos->fossil[n]; f!=NOSUCH; f = fos->fossilList[f].prec)
 			if(fos->fossilList[f].time<time[n])
 				count++;
 	}
@@ -194,11 +223,11 @@ TypeFossilTab *listToFossilTab(TypeFossilFeature *fos, int size) {
 	for(i=0; i<size; i++)
 		if(fos->fossil[i] >= 0) {
 			int f, n = 0;
-			for(f=fos->fossil[i]; f>=0; f=fos->fossilList[f].prec)
+			for(f=fos->fossil[i]; f!=NOSUCH; f=fos->fossilList[f].prec)
 				n++;
 			res[i].size = n;
 			res[i].time = (double*) malloc(n*sizeof(double));
-			for(f=fos->fossil[i]; f>=0; f=fos->fossilList[f].prec)
+			for(f=fos->fossil[i]; f!=NOSUCH; f=fos->fossilList[f].prec)
 				res[i].time[--n] = fos->fossilList[f].time;
 		} else {
 			res[i].size = 0;
@@ -256,7 +285,7 @@ void sprintFossilNHX(char *s, char *prefix, int e, TypeFossilList *list) {
 	int f;
 	if(prefix != NULL)
 		s += sprintf(s, "%s", prefix);
-	for(f=e; f>=0; f = list[f].prec)
+	for(f=e; f!=NOSUCH; f = list[f].prec)
 		s += sprintf(s, ":FOS=%lf", list[f].time);
 }
 
@@ -721,7 +750,7 @@ void fillBoundsFossil(int n, double tmin, double tmax, TypeTree *tree,  TypeFoss
 			min[n] = tmin;
 		}
 	}
-	for(c=tree->node[n].child; c>=0; c=tree->node[c].sibling)
+	for(c=tree->node[n].child; c!=NOSUCH; c=tree->node[c].sibling)
 		fillBoundsFossil(c, min[n], tmax, tree,  fos, min, max, dmax);
 	if(tree->time[n] != NO_TIME) {
 		max[n] = tree->time[n];
@@ -775,13 +804,13 @@ void fixFossilOrder(TypeFossilFeature* sample, int size) {
         if(sample->fossil[n]>=0)
             sample->fossil[n] = index[sample->fossil[n]];
     for(f=0; f<sample->size; f++)
-        if(sample->fossilList[f].prec>=0)
+        if(sample->fossilList[f].prec!=NOSUCH)
             sample->fossilList[f].prec = index[sample->fossilList[f].prec];
     free((void*) index);
     tmp = (int*) malloc((sample->size+1)*sizeof(int));
     for(n=0; n<size; n++) {
         int ind = 0;
-        for(f=sample->fossil[n]; f>=0; f=sample->fossilList[f].prec)
+        for(f=sample->fossil[n]; f!=NOSUCH; f=sample->fossilList[f].prec)
             tmp[ind++] = f;
         if(ind>0) {
             qsort(tmp, ind, sizeof(int), compareInt);
@@ -799,7 +828,7 @@ void printFossilDebug(FILE *fo, TypeFossilFeature* sample, int size) {
     for(n=0; n<size; n++) {
         if(sample->fossil[n] != NOSUCH) {
 			fprintf(fo, "node %d", n);
-			for(f=sample->fossil[n]; f>=0; f=sample->fossilList[f].prec)
+			for(f=sample->fossil[n]; f!=NOSUCH; f=sample->fossilList[f].prec)
 				fprintf(fo, ", %.3lf", sample->fossilList[f].time);
 			fprintf(fo, "\n");
 		}

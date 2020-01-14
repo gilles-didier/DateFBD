@@ -43,7 +43,7 @@
 #define MAX_TRIALS 1000
 #define MAX_NODE 100
 
-#define HELPMESSAGE "--------------------------\n\nNAME\n	draw - Drawing a single tree with the fossil ages\n	\nSYNOPSIS\n	draw [OPTIONS] <input Tree File> <input Fossil File>\n\nDESCRIPTION\n	Output a figure in various graphic formats of the tree in <input Tree File> with the fossil ages of  <input Fossil File>\n\n	Options are\n	-z <input Tree File>\n		output the tree in text debug format in the console and exit \n	-o <origin> \n		set the origin time\n	-e <end> \n		set the end time\n	-x <number>\n		set the graphic format of the output (option is required if one wants a graphic output)\n			-f 1 -> pdf\n			-f 2 -> postscript\n			-f 3 -> png\n			-f 4 -> svg\n			-f 5 -> LaTeX (psTricks)\n			-f 6 -> LaTeX (TikZ)\n	-h\n		display help\n\n--------------------------\n"
+#define HELPMESSAGE "--------------------------\n\nNAME\n	draw - Drawing a single tree with the fossil ages\n	\nSYNOPSIS\n	draw [OPTIONS] <input Tree File> <input Fossil File>\n\nDESCRIPTION\n	Output a figure in various graphic formats of the tree in <input Tree File> with the fossil ages of  <input Fossil File>\n\n	Options are\n	-z <input Tree File>\n		output the tree in text debug format in the console and exit \n	-o <origin> \n		set the origin time\n	-e <end> \n		set the end time\n	-x <number>\n		set the graphic format of the output (option is required if one wants a graphic output)\n			-x 1 -> pdf\n			-x 2 -> postscript\n			-x 3 -> png\n			-x 4 -> svg\n			-x 5 -> LaTeX (psTricks)\n			-x 6 -> LaTeX (TikZ)\n	-h\n		display help\n\n--------------------------\n"
 
 
 
@@ -51,7 +51,7 @@
 int main(int argc, char **argv) {	
 	char *inputFileNameTree, *inputFileNameFossil = NULL, *tmp, outputFileNameG[SIZE_BUFFER_CHAR], *outputFileName, option[256], format = '1';
 	FILE *fi;
-	int i, j;
+	int i, j, debug = 0;
 	double minTimeIntInf = NO_TIME, maxTimeIntSup = 0.;
 
 	for(i=0; i<256; i++)
@@ -89,6 +89,10 @@ int main(int argc, char **argv) {
 				exit(1);
 			}
 			exit(0);
+		}
+		if(option['d']) {
+			option['d'] = 0;
+			debug = 1;
 		}
 		if(option['o']) {
 			option['o'] = 0;
@@ -189,14 +193,36 @@ int main(int argc, char **argv) {
 				}
 			}
 		}
+		if(debug) {
+			int n;
+			if(tree->name == NULL) {
+				tree->name = (char**) malloc(tree->size*sizeof(char*));
+				for(n=0; n<tree->size; n++)
+					tree->name[n] = NULL;
+			}
+			for(n=0; n<tree->size; n++) {
+				char tmp[1000];
+				if(tree->name[n] == NULL) {
+					sprintf(tmp, "%d", n);
+					tree->name[n] = (char*) malloc((strlen(tmp)+1)*sizeof(char));
+					strcpy(tree->name[n], tmp);
+				} else {
+					sprintf(tmp, "%s (%d)", tree->name[n], n);
+					free((void*)tree->name[n]);
+					tree->name[n] = (char*) malloc((strlen(tmp)+1)*sizeof(char));
+					strcpy(tree->name[n], tmp);
+				}
+			}
+		}
 		if((tmp = strrchr(outputFileName, '.')) != NULL)
 			tmp[0] = '\0';
 		info.param.tmin = tree->minTime;
 		info.param.tmax = getMaximumTime(tree);
-		info.param.ratio = 0.71;
+//		info.param.ratio = 0.71;
+		info.param.ratio = 10;
 		info.param.scaleStep = 10.;
 		data.color = (TypeRGB) {.red = 0.63, .green = 0.32, .blue = 0.18};
-		data.radius = 2.;
+		data.radius = 5.;
 		data.alpha = 0.5;
 		data.fos = fos;
 		add.data = &data;

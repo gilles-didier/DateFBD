@@ -109,6 +109,67 @@ TypeDistribution agregDistribution(TypeDistribution *d, int size, int def) {
 	return res;
 }
 
+#define MAX_SIZE_TMP 50
+#define INC_BUFFER 50
+#define IS_SEP(c) (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ';')
+
+TypeDistribution readDistribution(FILE *f) {
+	char c, tmpA[MAX_SIZE_TMP+1], tmpB[MAX_SIZE_TMP+1];
+	int sizeBuffer;
+	TypeDistribution d;
+	sizeBuffer = INC_BUFFER;
+	d.item = (TypeDistributionItem*) malloc(sizeBuffer*sizeof(TypeDistributionItem));
+	d.size = 0;
+	do {
+		c = getc(f);
+	} while(c!=EOF && IS_SEP(c)); 
+	while(c != EOF) {
+		int i;
+		i = 0;
+		while(i<MAX_SIZE_TMP && c !=EOF && !IS_SEP(c)) {
+			tmpA[i] = c;
+			c = getc(f);
+			i++;
+		}
+		tmpA[i++] = '\0';
+		if(i == MAX_SIZE_TMP) {
+			fprintf(stderr, "Ident too long (%s) ...", tmpA);
+			exit(1);
+		}
+		if(i <= 1) {
+			fprintf(stderr, "Problem empty (%s) ...", tmpA);
+			exit(1);
+		}
+		while(c!=EOF && IS_SEP(c))
+			c=getc(f);
+		i = 0;
+		while(i<MAX_SIZE_TMP && c !=EOF && !IS_SEP(c)) {
+			tmpB[i] = c;
+			c = getc(f);
+			i++;
+		}
+		tmpB[i++] = '\0';
+		if(i == MAX_SIZE_TMP) {
+			fprintf(stderr, "Ident too long (%s) ...", tmpB);
+			exit(1);
+		}
+		if(i <= 1) {
+			fprintf(stderr, "Problem empty (%s) ...", tmpB);
+			exit(1);
+		}
+		if(d.size >= sizeBuffer) {
+			sizeBuffer += INC_BUFFER;
+			d.item = (TypeDistributionItem*) realloc((void *) d.item, sizeBuffer*sizeof(TypeDistributionItem));
+		}
+		d.item[d.size].val = atof(tmpA);
+		d.item[d.size].dens = atof(tmpB);
+		d.size++;
+		while(c!=EOF && IS_SEP(c))
+			c=getc(f);
+	}
+	d.item = (TypeDistributionItem*) realloc((void *) d.item, d.size*sizeof(TypeDistributionItem));
+	return d;
+}
 
 void fprintDistribution(FILE *f, TypeDistribution d) {
 	int i;
@@ -168,6 +229,14 @@ void deriveDistribution(TypeDistribution *d) {
 	}
 }
 
+void integrateDistribution(TypeDistribution *d) {
+	if(d->size>0) {
+		int i;
+		d->item[0].dens = (d->item[0].dens)*(d->item[1].val-d->item[0].val);
+		for(i=1; i<d->size; i++)
+			d->item[i].dens = d->item[i-1].dens+(d->item[i].dens)*(d->item[i].val-d->item[i-1].val);
+	}
+}
 
 double getMean(TypeDistribution d) {
 	int i;

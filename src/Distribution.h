@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 
+TypeDistribution readDistribution(FILE *f);
 int compareDistributionItem(const void* a, const void* b);
 //TypeDistribution meanDistribution(TypeDistribution d1, double w1, TypeDistribution d2, double w2);
 void fprintDistribution(FILE *f, TypeDistribution d);
@@ -31,6 +32,7 @@ double getMedianDens(TypeDistribution d);
 double getQuantileInf(TypeDistribution d, double q);
 double getQuantileSup(TypeDistribution d, double q);
 void deriveDistribution(TypeDistribution *d);
+void integrateDistribution(TypeDistribution *d);
 TypeDistribution agregDistribution(TypeDistribution *d, int size, int def);
 TypeDistribution resampleDistribution(TypeDistribution d, double min, double max, int def);
 

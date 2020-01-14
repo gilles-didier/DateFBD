@@ -3,6 +3,7 @@
 #include <math.h>
 #include <ctype.h>
 #include "Utils.h"
+#include "MyError.h"
 //#include "Random.h"
 
 #include "FossilInt.h"
@@ -292,6 +293,7 @@ TypeFossilFeature *sampleFossilInt(TypeFossilIntFeature* feat, int size) {
         sample->fossilList[i].prec = feat->fossilIntList[i].prec;
 //		sample->fossilList[i].time = feat->fossilIntList[i].fossilInt.inf+getUniformCont(feat->fossilIntList[i].fossilInt.sup-feat->fossilIntList[i].fossilInt.inf);
         sample->fossilList[i].time = feat->fossilIntList[i].fossilInt.inf+UNIF_RAND*(feat->fossilIntList[i].fossilInt.sup-feat->fossilIntList[i].fossilInt.inf);
+//printf("fossil %d t %.2lf [%.2lf, %.2lf]\n", i, sample->fossilList[i].time, feat->fossilIntList[i].fossilInt.inf, feat->fossilIntList[i].fossilInt.sup);
     }
     index = qsortindex(sample->fossilList, sample->size, sizeof(TypeFossilList), compareFossilList);
     for(n=0; n<size; n++)
@@ -644,8 +646,10 @@ TypeNameFossilIntTab *readFossilIntTab(FILE *f) {
                 c = fgetc(f);
             }
         }
-        if(i == MAX_NAME_SIZE)
-            exitProg(ErrorExec, "Name too much long...");
+        if(i == MAX_NAME_SIZE) {
+			tmp[i] = '\0';
+            error("Name too much long:\n'%s'", tmp);
+        }
         tmp[i++] = '\0';
         if(i>1) {
             char bof[MAX_NAME_SIZE+1];
@@ -727,19 +731,19 @@ void freeIndexFossilIntTab(TypeIndexFossilIntTab *list) {
 
 
 void freeFossilIntFeature(TypeFossilIntFeature *fos) {
-    if(fos == NULL)
-        return;
-    if(fos->fossilIntList != NULL)
-        free((void*)fos->fossilIntList);
-   if(fos->endTimeTable != NULL)
-        free((void*)fos->endTimeTable);
-    if(fos->fossilInt != NULL)
-        free((void*)fos->fossilInt);
-    if(fos->endTime != NULL)
-        free((void*)fos->endTime);
-    if(fos->status != NULL)
-        free((void*)fos->status);
-    free((void*)fos);
+	if(fos == NULL)
+		return;
+	if(fos->fossilIntList != NULL)
+		free((void*)fos->fossilIntList);
+	if(fos->endTimeTable != NULL)
+		free((void*)fos->endTimeTable);
+	if(fos->fossilInt != NULL)
+		free((void*)fos->fossilInt);
+	if(fos->endTime != NULL)
+		free((void*)fos->endTime);
+	if(fos->status != NULL)
+		free((void*)fos->status);
+	free((void*)fos);
 }
 
 void removeFossilIntFossil(TypeFossilIntFeature *fos, int* list) {
@@ -890,97 +894,90 @@ TypeIndexFossilIntTab *name2indexFossilIntTab(TypeNameFossilIntTab *tab, char **
 
 
 TypeFossilIntFeature *getFossilIntFeature(FILE *fi, char **name, int size) {
-    TypeLexiTree *dict;
-    TypeNameFossilIntTab *list;
-    int i, n, f, *tmp;
-    size_t *index;
-    TypeFossilIntFeature *fos;
-    dict = getDictNameTab(name, size);
-//for(i=0; i<size; i++) {
-	//if(name[i] != NULL)
-		//printf("%s\n", name[i]);
-//}
-//printf("\n\n");
-    list = readFossilIntTab(fi);
-    fos = (TypeFossilIntFeature *) malloc(sizeof(TypeFossilIntFeature));
+	TypeLexiTree *dict;
+	TypeNameFossilIntTab *list;
+	int i, n, f, *tmp;
+	size_t *index;
+	TypeFossilIntFeature *fos;
+	dict = getDictNameTab(name, size);
+	list = readFossilIntTab(fi);
+	fos = (TypeFossilIntFeature *) malloc(sizeof(TypeFossilIntFeature));
 	fos->endTime = NULL;
-    fos->sizeFossil = 0;
-    fos->sizeBufFossil = INC_FOSSIL_ITEM;
-    fos->sizeBufNode = size;
-    fos->sizeNode = size;
-    fos->fossilIntList = (TypeFossilIntList*) malloc(fos->sizeBufFossil*sizeof(TypeFossilIntList));
-    fos->fossilInt = (int*) malloc(size*sizeof(int));
-    fos->status = (TypeNodeStatus*) malloc(size*sizeof(TypeNodeStatus));
-    fos->endTimeTable = (TypeTimeInterval*)malloc(size*sizeof(TypeTimeInterval));
-   for(i=0; i<size; i++) {
-        fos->fossilInt[i] = NOSUCH;
-        fos->status[i] = noneNodeStatus;
-    }
-    for(i=0; i<list->size; i++) {
-//printf("name %d %s (%d)\n", i, list->name[i], findWordLexi(list->name[i], dict));
-        if((n = findWordLexi(list->name[i], dict))>=0) {
-            TypeFossilIntTab ftab;
-            ftab = list->fossilIntTab[i];
+	fos->sizeFossil = 0;
+	fos->sizeBufFossil = INC_FOSSIL_ITEM;
+	fos->sizeBufNode = size;
+	fos->sizeNode = size;
+	fos->fossilIntList = (TypeFossilIntList*) malloc(fos->sizeBufFossil*sizeof(TypeFossilIntList));
+	fos->fossilInt = (int*) malloc(size*sizeof(int));
+	fos->status = (TypeNodeStatus*) malloc(size*sizeof(TypeNodeStatus));
+	fos->endTimeTable = (TypeTimeInterval*)malloc(size*sizeof(TypeTimeInterval));
+	for(i=0; i<size; i++) {
+		fos->fossilInt[i] = NOSUCH;
+		fos->status[i] = noneNodeStatus;
+	}
+	for(i=0; i<list->size; i++) {
+		if((n = findWordLexi(list->name[i], dict))>=0) {
+			TypeFossilIntTab ftab;
+			ftab = list->fossilIntTab[i];
 			if(list->stopTime[i] != NO_TIME) {
 				int ind = 0;
 				for(f=0; f<ftab.size; f++)
-					if(ftab.fossilInt[f].inf>=list->stopTime[i] && ftab.fossilInt[f].sup>=list->stopTime[i])
-						ftab.fossilInt[ind++] = ftab.fossilInt[f];
+				if(ftab.fossilInt[f].inf>=list->stopTime[i] && ftab.fossilInt[f].sup>=list->stopTime[i])
+					ftab.fossilInt[ind++] = ftab.fossilInt[f];
 				ftab.size = ind;
 				fos->status[n] = unknownNodeStatus;
 				fos->endTimeTable[n].inf = list->stopTime[i];
 				fos->endTimeTable[n].sup = list->stopTime[i];
 			}
-            if(ftab.size>0) {
-//printf("\tstatus %d\n", fos->status[n]);
-                int prec;
-                if(fos->sizeFossil+ftab.size >= fos->sizeBufFossil) {
-                    fos->sizeBufFossil += ftab.size+INC_FOSSIL_ITEM;
-                    fos->fossilIntList = (TypeFossilIntList*) realloc((void*)fos->fossilIntList, fos->sizeBufFossil*sizeof(TypeFossilIntList));
-                }
-                prec = -1;
-                for(f=0; f<ftab.size; f++) {
-                    fos->fossilIntList[fos->sizeFossil].fossilInt = ftab.fossilInt[f];
-                    fos->fossilIntList[fos->sizeFossil].prec = prec;
-                    prec = fos->sizeFossil;
-                    fos->sizeFossil++;
-                }
-                fos->fossilInt[n] = fos->sizeFossil-1;
-                free((void*) ftab.fossilInt);
-            }
-        }
-    }
-    for(i=0; i<list->size; i++)
+			if(ftab.size>0) {
+				int prec;
+				if(fos->sizeFossil+ftab.size >= fos->sizeBufFossil) {
+					fos->sizeBufFossil += ftab.size+INC_FOSSIL_ITEM;
+					fos->fossilIntList = (TypeFossilIntList*) realloc((void*)fos->fossilIntList, fos->sizeBufFossil*sizeof(TypeFossilIntList));
+				}
+				prec = -1;
+				for(f=0; f<ftab.size; f++) {
+					fos->fossilIntList[fos->sizeFossil].fossilInt = ftab.fossilInt[f];
+					fos->fossilIntList[fos->sizeFossil].prec = prec;
+					prec = fos->sizeFossil;
+					fos->sizeFossil++;
+				}
+				fos->fossilInt[n] = fos->sizeFossil-1;
+			}
+		}
+		free((void*) list->fossilIntTab[i].fossilInt);
+	}
+	for(i=0; i<list->size; i++)
 		if(list->name[i] != NULL)
 			free(list->name[i]);
 	free(list->name);
- 	free(list->stopTime);
-   free(list->fossilIntTab);
-    free(list);
-    freeLexiTree(dict);
-    index = qsortindex(fos->fossilIntList, fos->sizeFossil, sizeof(TypeFossilIntList), compareFossilInt);
-    for(n=0; n<size; n++)
-        if(fos->fossilInt[n]>=0)
-            fos->fossilInt[n] = index[fos->fossilInt[n]];
-    for(f=0; f<fos->sizeFossil; f++)
-        if(fos->fossilIntList[f].prec>=0)
-            fos->fossilIntList[f].prec = index[fos->fossilIntList[f].prec];
-    free((void*) index);
-    tmp = (int*) malloc((fos->sizeFossil+1)*sizeof(int));
-    for(n=0; n<size; n++) {
-        int ind = 0;
-        for(f=fos->fossilInt[n]; f>=0; f=fos->fossilIntList[f].prec)
-            tmp[ind++] = f;
-        if(ind>0) {
-            qsort(tmp, ind, sizeof(int), compareInt);
-            fos->fossilIntList[tmp[0]].prec = -1;
-            for(f=1; f<ind; f++)
-                fos->fossilIntList[tmp[f]].prec = tmp[f-1];
-            fos->fossilInt[n] = tmp[ind-1];
-        }
-    }
-    free((void*)tmp);
-    return fos;
+	free(list->stopTime);
+	free(list->fossilIntTab);
+	free(list);
+	freeLexiTree(dict);
+	index = qsortindex(fos->fossilIntList, fos->sizeFossil, sizeof(TypeFossilIntList), compareFossilInt);
+	for(n=0; n<size; n++)
+		if(fos->fossilInt[n]>=0)
+			fos->fossilInt[n] = index[fos->fossilInt[n]];
+	for(f=0; f<fos->sizeFossil; f++)
+		if(fos->fossilIntList[f].prec>=0)
+			fos->fossilIntList[f].prec = index[fos->fossilIntList[f].prec];
+	free((void*) index);
+	tmp = (int*) malloc((fos->sizeFossil+1)*sizeof(int));
+	for(n=0; n<size; n++) {
+		int ind = 0;
+		for(f=fos->fossilInt[n]; f>=0; f=fos->fossilIntList[f].prec)
+			tmp[ind++] = f;
+		if(ind>0) {
+			qsort(tmp, ind, sizeof(int), compareInt);
+			fos->fossilIntList[tmp[0]].prec = -1;
+			for(f=1; f<ind; f++)
+				fos->fossilIntList[tmp[f]].prec = tmp[f-1];
+			fos->fossilInt[n] = tmp[ind-1];
+		}
+	}
+	free((void*)tmp);
+	return fos;
 }
 
 /*print fossilInt*/
