@@ -16,13 +16,17 @@ Software includes
 	implements 'dist' and 'diag' in the R environment (some features of the standalone software such as the multithreading are not available yet)
 
 type
+
 	> make all
+	
 	in a console opened on the src directory for compiling standalone software.
 	
-type	
+type
+
 	> install.packages("<path to>/rfbd_0.0.tar.gz", repos = NULL, type = "source")
 
 	> library(rfbd)
+	
 	in a R console for loading the R package (where <path to> is the path to the file 'rfbd_0.0.tar.gz')
 
 Directory "src" contains the C sources of the standalone software
