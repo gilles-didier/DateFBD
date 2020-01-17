@@ -192,6 +192,13 @@ int main(int argc, char **argv) {
 			else
 				exitProg(ErrorArgument, "a number is expected after -b");
 		}
+		if(option['l']) {
+			option['l'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &al) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "a number is expected after -l");
+		}
 		if(option['u']) {
 			option['u'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &(step)) == 1)

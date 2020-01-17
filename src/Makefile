@@ -25,7 +25,7 @@ LD = $(CC)
 
 ############ LIST OF EXECUTABLE TARGETS (MODIFY ONLY TO ADD AN EXECUTABLE) ##############
 
-all: Makefile.d $(DIST) $(TREE) $(ESTI) $(DRAW)
+all: Makefile.d $(DIST) $(DIAG) $(TREE) $(ESTI) $(DRAW)
 
 # build the executable
 $(DIST): $(OBJ_DIST)

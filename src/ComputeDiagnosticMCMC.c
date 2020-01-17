@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
 	char *inputFileNameTree, *inputFileNameFossil = NULL, *outputPrefix = PREFIX, option[256];
 	FILE *fi, *ff;
 	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, maxT = 2;
-	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., step = 0.1, time, prop = 0.25, probSpe = 0.33, probExt = 0.33;
+	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., step = 0.1, time, al = 0.75, prop = 0.25, probSpe = 0.33, probExt = 0.33;
 	TypeModelParam param = {.birth=1.3, .death = 1., .fossil = 1., .sampling = 1.}, windSize = {.birth=0.1, .death = 0.1, .fossil = 0.02, .sampling = 1.}, init = {.birth=0.5, .death = 0.5, .fossil = 0.1, .sampling = 1.};
 
 //feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);	
@@ -184,6 +184,13 @@ int main(int argc, char **argv) {
 				exitProg(ErrorArgument, "3 values are expected after -p");
 
 		}
+		if(option['l']) {
+			option['l'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &al) == 1)
+				i++;
+			else
+				exitProg(ErrorArgument, "a number is expected after -l");
+		}
 		if(option['s']) {
 			option['s'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &nSamp) == 1)
@@ -302,7 +309,7 @@ int main(int argc, char **argv) {
 		sprintf(nameIndex, "%s.ind", outputPrefix);
 		
 		if((fout = fopen(nameOutput, "w")) && (find = fopen(nameIndex, "w"))) {
-			MCMCSamplingDiag(fout, find, tree, sizeTree, fos, 500., 0.75, nBurn, nGap, nSamp, prop, &windSize, &init, probSpe, probExt);
+			MCMCSamplingDiag(fout, find, tree, sizeTree, fos, al, nBurn, nGap, nSamp, prop, &windSize, &init, probSpe, probExt);
 			fclose(fout);
 			fclose(find);
 		}

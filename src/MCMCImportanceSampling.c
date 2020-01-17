@@ -549,7 +549,7 @@ void *threadComputeDistribution(void *data) {
 }
 
 
-void MCMCSamplingDiag(FILE *fout, FILE *find, TypeTree **tree, int nTree, TypeFossilIntFeature **fi, double step, double al, int burn, int gap, int iter, double prop, TypeModelParam *windSize, TypeModelParam *init, double probSpe, double probExt) {
+void MCMCSamplingDiag(FILE *fout, FILE *find, TypeTree **tree, int nTree, TypeFossilIntFeature **fi, double al, int burn, int gap, int iter, double prop, TypeModelParam *windSize, TypeModelParam *init, double probSpe, double probExt) {
 	int *fol, **branch, f, i , s, n,  **indexNode;
 	double prob, **save;
 	TypeFossilFeature **fp;
