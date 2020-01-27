@@ -264,7 +264,7 @@ DESCRIPTION
 
 EXAMPLE
 
-./tree -o -400 -s 2000 -b 10000 -g 300 -r 5555 -f 0.25 -a 0.33 0.33 -w 0.1 0.1 0.01 -i 5. 5. 5. -t 40 -x 6 -n 0 -n 1 -n 2  -n 5 -n 7 -n 24 -n 25 -n 26 -n 27 -n 32 -n 67 -n 68 -n 103 -n 104 -n 129 -n 130 -n 147 -n 202 -n 203 -n 204 -n 208 -n 209 -n 236 -n 237 -n 276 CotylosauriaTree.phy CotylosauriaAges.csv distribution
+./tree -o -400 -s 2000 -b 10000 -g 300 -f 0.25 -a 0.33 0.33 -w 0.1 0.1 0.01 -i 5. 5. 5. -t 40 -x 6 -n 0 -n 1 -n 2  -n 5 -n 7 -n 24 -n 25 -n 26 -n 27 -n 32 -n 67 -n 68 -n 103 -n 104 -n 129 -n 130 -n 147 -n 202 -n 203 -n 204 -n 208 -n 209 -n 236 -n 237 -n 276 CotylosauriaTree.phy CotylosauriaAges.csv distribution
 
 --------------------------
 
