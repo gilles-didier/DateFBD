@@ -78,7 +78,7 @@ TypeLexiTree *getDictNameTab(char **name, int size) {
     for(i=0; i<size; i++)
         if(name && name[i]) {
             if(addWordLexi(name[i], i, dict)>=0)
-                printf("Warning! duplicate identifier '%s'\n", name[i]);
+                warning("Warning! duplicate identifier '%s'\n", name[i]);
         }
     return dict;
 }
@@ -241,7 +241,7 @@ void printIndex(FILE *f, TypeIndex *index) {
 void initIndex(TypeIndex *index) {
     index->size = 0;
     index->buffer = INC_BUFFER_UTILS;
-    index->name = (char **) monmalloc(index->buffer*sizeof(char*));
+    index->name = (char **) malloc(index->buffer*sizeof(char*));
     index->dict = newDictNode('x');
 }
 
@@ -254,9 +254,9 @@ int addIndex(char *name, TypeIndex *species) {
     if(species->size > sizeTmp) {
         if(sizeTmp >= species->buffer) {
             species->buffer += INC_BUFFER_UTILS;
-            species->name = (char**) monrealloc(species->name, species->buffer*sizeof(char*));
+            species->name = (char**) realloc(species->name, species->buffer*sizeof(char*));
         }
-        species->name[index] = (char*) monmalloc((strlen(name)+1)*sizeof(char));
+        species->name[index] = (char*) malloc((strlen(name)+1)*sizeof(char));
         strcpy(species->name[index], name);
     }
     return index;
@@ -264,7 +264,7 @@ int addIndex(char *name, TypeIndex *species) {
 
 TypeDictNode *newDictNode(char c){
     TypeDictNode *n;
-    n = (TypeDictNode *) monmalloc(sizeof(TypeDictNode));
+    n = (TypeDictNode *) malloc(sizeof(TypeDictNode));
     n->symbol = c;
     n->child = NULL;
     n->sibling = NULL;
@@ -318,68 +318,7 @@ int getIndexString(char *s, TypeDictNode *cur, int *size) {
     return cur->index;
 }
 
-void exitProg(TypeExit code, char *message) {
-    switch(code)
-    {
-        case ErrorArgument:
-            printf("Error when reading arguments\n");
-            break;
-        case ErrorInit:
-            printf("Problem of initialization\n");
-            break;
-        case ErrorReading:
-            printf("Problem when reading a file\n");
-            break;
-        case ErrorWriting:
-            printf("Problem when writing a file\n");
-            break;
-        case ErrorMemory:
-            printf("Not enougth memory\n");
-            break;
-        case ErrorExec:
-            printf("Problem during execution...\n");
-            break;
-        case ErrorArgs:
-            printf("No alphabet selected...\n");
-            break;
-        default:
-            printf("Unknown error\n");
-    }
-    if(message != NULL)
-        printf("%s\n", message);
-    if(code == ExitOk)
-        exit(EXIT_SUCCESS);
-    else
-        exit(EXIT_FAILURE);
-}
 
-/****************************************************/
-/************** Allocations ********************/
-/****************************************************/
-void *monmalloc(long size) {
-    void *point;
-    if(size<0 || !(point = malloc(size))) {
-        char tmp[200];
-        sprintf(tmp, "Try to allocate %ld bytes\n", size);
-        exitProg(ErrorMemory, tmp);
-    }
-    return point;
-}
-
-void *monrealloc(void *in, long size) {
-    void *point;
-    if(size<0 || !(point = realloc(in, size))) {
-        char tmp[200];
-        sprintf(tmp, "Try to reallocate %ld bytes\n", size);
-        exitProg(ErrorMemory, tmp);
-    }
-    return point;
-}
-
-void monfree(void *in) {
-    if(in != 0L)
-        free(in);
-}
 int IsSeparator(char c) {
     return (c == ' ' || c == '\t' || c == '\n' || c == '\r');
 }
@@ -582,8 +521,8 @@ size_t *qsortindex(void *base, size_t nitems, size_t size, int (*compar)(const v
         index[(((size_t)p[i])-((size_t)data))/size] = i;
         memcpy((void*)(((size_t)base)+i*size), p[i], size);
     }
-    monfree((void*)data);
-    monfree((void*)p);
+    free((void*)data);
+    free((void*)p);
     return index;
 }
 
@@ -603,8 +542,8 @@ size_t *qsortTable(void *base, size_t nitems, size_t size, int (*compar)(const v
     qsort(p, nitems, sizeof(void*), compareIndirect);
     for(i=0; i<nitems; i++)
         index[i] = (((size_t)p[i])-((size_t)data))/size;
-    monfree((void*)data);
-    monfree((void*)p);
+    free((void*)data);
+    free((void*)p);
     return index;
 }
 
@@ -632,30 +571,24 @@ void toInterval(char *s, double *inf, double *sup) {
         for(; s[i] != '\0' && s[i] != ':' && s[i] != ';' && !isspace(s[i]) && ind<MAX_SIZE; i++)
             tmp[ind++] = s[i];
         tmp[ind] = '\0';
-        if(ind>=MAX_SIZE) {
-            fprintf(stderr, "Error when reading an interval - number too long:\n%s...\n", tmp);
-            exit(1);
-        }
+        if(ind>=MAX_SIZE)
+            error("Error when reading an interval - number too long:\n%s...\n", tmp);
         *inf = atof(tmp);
         for(; s[i] != '\0' && isspace(s[i]); i++);
         if(s[i] != ':' && s[i] != ';')
-            exitProg(ErrorReading, "Missing ':' or ';' while reading an interval.");
+            error("Missing ':' or ';' while reading an interval.");
         i++;
         for(; s[i] != '\0' && isspace(s[i]); i++);
         ind = 0;
         for(; s[i] != '\0' && s[i] != ')' && s[i] != ']' && !isspace(s[i]); i++)
             tmp[ind++] = s[i];
         tmp[ind] = '\0';
-        if(ind>=MAX_SIZE) {
-            fprintf(stderr, "Error when reading an interval - number too long:\n%s...\n", tmp);
-            exit(1);
-        }
+        if(ind>=MAX_SIZE)
+            error("Error when reading an interval - number too long:\n%s...\n", tmp);
         *sup =	atof(tmp);
         for(; s[i] != '\0' && isspace(s[i]); i++);
-        if(s[i] != ')' && s[i] != ']') {
-            fprintf(stderr, "Missing ')' or ']' while reading an interval.\n%s\n", s);
-            exit(1);
-        }
+        if(s[i] != ')' && s[i] != ']')
+            error("Missing ')' or ']' while reading an interval.\n%s\n", s);
         if(*sup<*inf) {
             double tmp = *sup;
             *sup = *inf;

@@ -211,6 +211,17 @@ void drawLineCairo(double x1, double y1, double x2, double y2, TypeParamDrawTree
 	cairo_restore(cr);
 }
 
+void drawLineColorAlphaCairo(TypeRGB rgb, double alpha, double x1, double y1, double x2, double y2, TypeParamDrawTreeGeneric *param) {
+	cairo_t *cr = ((TypeCairoInfo*)param->info)->cr;
+	cairo_save(cr);
+	cairo_set_source_rgba (cr, rgb.red, rgb.green, rgb.blue, alpha);
+	cairo_set_line_width (cr, CAIRO_LINE_WIDTH);
+	cairo_move_to (cr, x1, y1);
+	cairo_line_to (cr, x2, y2);
+	cairo_stroke (cr);
+	cairo_restore(cr);
+}
+
 void drawLineDotCairo(TypeRGB rgb, double alpha, double radius, double x1, double y1, double x2, double y2, TypeParamDrawTreeGeneric *param) {
 	cairo_t *cr = ((TypeCairoInfo*)param->info)->cr;
 	cairo_save(cr);
@@ -331,6 +342,7 @@ void setFunctCairo(TypeFunctDrawTreeGeneric *funct) {
 	funct->fillWedge = fillWedgeCairo;
 	funct->drawWedge = drawWedgeCairo;
 	funct->fillGradient = fillGradientCairo;
+	funct->drawLineColorAlpha = drawLineColorAlphaCairo;
 }
 void setFunctSVG(TypeFunctDrawTreeGeneric *funct) {
 	funct->startStd = startSVGStd;
@@ -370,7 +382,7 @@ void startSVG(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	cairo_font_extents (cr, &extentsF);
 //	param->height = LEAFSEP*(countLeaves(tree)+1)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
 	param->height = LEAFSEP*(countLeaves(tree)+2)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
-	param->width = param->height*param->ratio;
+//	param->width = param->height*param->ratio;
 	//if(countLeaves(tree)>40)
 		//param->width = param->height/sqrt(2);
 	//else
@@ -381,7 +393,7 @@ void startSVG(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	cr = cairo_create (surface);
 	setParamCairo(param);
 	param->tmin = tree->minTime;
-    param->tmax = tree->maxTime;
+//    param->tmax = tree->maxTime;
 	param->info = (void*) malloc(sizeof(TypeCairoInfo));
 	((TypeCairoInfo*)param->info)->cr = cr;
 	((TypeCairoInfo*)param->info)->cr = cr;
@@ -438,7 +450,7 @@ void startPDF(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	cairo_font_extents(cr, &extentsF);
 //	param->height = LEAFSEP*(countLeaves(tree)+1)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
 	param->height = LEAFSEP*(countLeaves(tree)+2)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
-	param->width = param->height*param->ratio;
+//	param->width = param->height*param->ratio;
 	//if(countLeaves(tree)>40)
 		//param->width = param->height/sqrt(2);
 	//else
@@ -453,8 +465,7 @@ void startPDF(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	((TypeCairoInfo*)param->info)->filename = filename;
 	setParamCairo(param);
 	param->tmin = tree->minTime;
-    param->tmax = tree->maxTime;
-	param->labelWidth = getMaxLeafLabelWidthCairo(tree->name, tree->size, cr);	
+ 	param->labelWidth = getMaxLeafLabelWidthCairo(tree->name, tree->size, cr);	
 	param->scale = (param->width-param->labelWidth-param->xoffset-param->labelSep)/((param->tmax-param->tmin));
 	param->curgb = (TypeRGB) {.red = 0., .green = 0., .blue = 0.};
 	cairo_set_source_rgba (cr, param->curgb.red, param->curgb.green, param->curgb.blue, 1.);
@@ -498,7 +509,7 @@ void startPS(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	cairo_font_extents (cr, &extentsF);
 //	param->height = LEAFSEP*(countLeaves(tree)+1)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
 	param->height = LEAFSEP*(countLeaves(tree)+2)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
-	param->width = param->height*param->ratio;
+//	param->width = param->height*param->ratio;
 	//if(countLeaves(tree)>40)
 		//param->width = param->height/sqrt(2);
 	//else
@@ -509,7 +520,7 @@ void startPS(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	cr = cairo_create (surface);
 	setParamCairo(param);
 	param->tmin = tree->minTime;
-    param->tmax = tree->maxTime;
+//    param->tmax = tree->maxTime;
 	param->info = (void*) malloc(sizeof(TypeCairoInfo));
 	((TypeCairoInfo*)param->info)->cr = cr;
 	((TypeCairoInfo*)param->info)->cr = cr;
@@ -558,7 +569,7 @@ void startPNG(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	cairo_font_extents (cr, &extentsF);
 //	param->height = LEAFSEP*(countLeaves(tree)+1)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
 	param->height = LEAFSEP*(countLeaves(tree)+2)+extentsF.descent+extentsF.ascent+2*LABELSEP+TICKLENGTH;
-	param->width = param->height*param->ratio;
+//	param->width = param->height*param->ratio;
 	//if(countLeaves(tree)>40)
 		//param->width = param->height/sqrt(2);
 	//else
@@ -569,7 +580,7 @@ void startPNG(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	cr = cairo_create (surface);
 	setParamCairo(param);
 	param->tmin = tree->minTime;
-    param->tmax = tree->maxTime;
+//    param->tmax = tree->maxTime;
 	param->info = (void*) malloc(sizeof(TypeCairoInfo));
 	((TypeCairoInfo*)param->info)->cr = cr;
 	((TypeCairoInfo*)param->info)->cr = cr;

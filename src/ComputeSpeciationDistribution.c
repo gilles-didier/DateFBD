@@ -50,11 +50,13 @@
 
 
 
+static char **readList(FILE *f);
+
 int main(int argc, char **argv) {	
-	char *inputFileNameTree, *inputFileNameFossil = NULL, *outputPrefix = PREFIX, option[256];
-	FILE *fi, *ff;
-	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, maxT = 2;
-	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., step = 0.1, time, al = 0.75, prop = 0.25, probSpe = 0.33, probExt = 0.33;
+	char *inputFileNameTree, *inputFileNameList, *inputFileNameFossil = NULL, *outputPrefix = PREFIX, outputDistribution[STRING_SIZE], option[256];
+	FILE *fi, *fl, *ff, *fo;
+	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, outDens = 1, maxT = 2;
+	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., step = 0.1, al = 0.75, prop = 0.25, probSpe = 0.33, probExt = 0.33;
 	TypeModelParam param = {.birth=1.3, .death = 1., .fossil = 1., .sampling = 1.}, windSize = {.birth=0.1, .death = 0.1, .fossil = 0.02, .sampling = 1.}, init = {.birth=0.5, .death = 0.5, .fossil = 0.1, .sampling = 1.};
 
 //feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);	
@@ -82,18 +84,6 @@ int main(int argc, char **argv) {
 						if(tree->time[n]>tree->maxTime)
 							tree->maxTime = tree->time[n];
 				}
-				//TypeInfoDrawTreeGeneric info;
-				//double *timeSave;
-				//int n;
-				//timeSave = tree->time;
-				//tree->time = (double*) malloc(tree->size*sizeof(double));
-				//for(n=0; n<tree->size; n++)
-					//tree->time[n] = timeSave[n];
-				//fillUnknownTimes(tree->minTime, tree->maxTime, tree);
-				//setFunctPDF(&(info.funct));
-				//drawTreeFileGenericDebug("tree.pdf", tree, &info, NULL);
-				//free((void*) tree->time);
-				//tree->time = timeSave;
 			} else {
 				fprintf(stderr, "Error while reading %s.\n", argv[i]);
 				exit(1);
@@ -111,63 +101,6 @@ int main(int argc, char **argv) {
 			else
 				minTimeIntSup = NO_TIME;
 		}
-		if(option['a']) {
-			option['a'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%le", &probSpe) == 1)
-				i++;
-			else
-				error("2 values are expected after -a");
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &probExt) == 1)
-				i++;
-			else
-				error("2 values are expected after -a");
-		}
-		if(option['w']) {
-			option['w'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%le", &windSize.birth) == 1)
-				i++;
-			else
-				error("3 values are expected after -a");
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.death) == 1)
-				i++;
-			else
-				error("3 values are expected after -a");
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.fossil) == 1)
-				i++;
-			else
-				error("3 values are expected after -a");
-		}
-		if(option['i']) {
-			option['i'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%le", &init.birth) == 1)
-				i++;
-			else
-				error("3 values are expected after -a");
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.death) == 1)
-				i++;
-			else
-				error("3 values are expected after -a");
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.fossil) == 1)
-				i++;
-			else
-				error("3 values are expected after -a");
-		}
-		if(option['f']) {
-			option['f'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &prop) == 1)
-				i++;
-			else
-				error("a number is required after option -t");
-		}
-		if(option['r']) {
-			unsigned int seed;
-			option['r'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%u", &seed) == 1) {
-				srand(seed);
-				i++;
-			} else
-				error("3 values are expected after -p");
-		}
 		if(option['p']) {
 			option['p'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &(param.birth)) == 1)
@@ -184,12 +117,59 @@ int main(int argc, char **argv) {
 				error("3 values are expected after -p");
 
 		}
-		if(option['l']) {
-			option['l'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%le", &al) == 1)
+		if(option['a']) {
+			option['a'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &probSpe) == 1)
 				i++;
 			else
-				error("a number is expected after -l");
+				error("2 values are expected after -a");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &probExt) == 1)
+				i++;
+			else
+				error("2 values are expected after -a");
+		}
+		if(option['w']) {
+			option['w'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &windSize.birth) == 1)
+				i++;
+			else
+				error("3 values are expected after -w");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.death) == 1)
+				i++;
+			else
+				error("3 values are expected after -w");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.fossil) == 1)
+				i++;
+			else
+				error("3 values are expected after -w");
+		}
+		if(option['i']) {
+			option['i'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &init.birth) == 1)
+				i++;
+			else
+				error("3 values are expected after -i");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.death) == 1)
+				i++;
+			else
+				error("3 values are expected after -i");
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.fossil) == 1)
+				i++;
+			else
+				error("3 values are expected after -i");
+		}
+		if(option['r']) {
+			unsigned int seed;
+			option['r'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%u", &seed) == 1) {
+				srand(seed);
+				i++;
+			} else
+				error("1 values are expected after -r");
+		}
+		if(option['d']) {
+			option['d'] = 0;
+			outDens = 0;
 		}
 		if(option['s']) {
 			option['s'] = 0;
@@ -205,19 +185,19 @@ int main(int argc, char **argv) {
 			else
 				error("a number is expected after -b");
 		}
-		if(option['x']) {
-			option['x'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &time) == 1)
-				i++;
-			else
-				error("a number is expected after -b");
-		}
 		if(option['g']) {
 			option['g'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &nGap) == 1)
 				i++;
 			else
 				error("a number is expected after -b");
+		}
+		if(option['l']) {
+			option['l'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%le", &al) == 1)
+				i++;
+			else
+				error("a number is expected after -l");
 		}
 		if(option['u']) {
 			option['u'] = 0;
@@ -233,28 +213,46 @@ int main(int argc, char **argv) {
 			else
 				error("a number is required after option -t");
 		}
+		if(option['f']) {
+			option['f'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &prop) == 1)
+				i++;
+			else
+				error("a number is required after option -t");
+		}
 		if(option['h']) {
 			option['h'] = 0;
 			error("%s\n", HELPMESSAGE);
 		}
 	}
 	if(i<argc) {
+		inputFileNameList = argv[i++];
+	} else {
+		fprintf(stderr, "Please provide the name of a file containing a list of leaf names\n");
+		exit(1);
+	}
+	if(i<argc) {
 		inputFileNameTree = argv[i++];
 	} else {
-		error("Please provide the name of a file containing a phylogenetic tree in Newick format\n");
+		fprintf(stderr, "Please provide the name of a file containing a phylogenetic tree in Newick format\n");
+		exit(1);
 	}
 	if(i<argc) {
 		inputFileNameFossil = argv[i++];
 	} else {
-		error("Please provide the name of a file containing a fossil list\n");
+		fprintf(stderr, "Please provide the name of a file containing a fossil list\n");
+		exit(1);
 	}
 	if(i<argc)
 		outputPrefix = argv[i++];
-	if((fi = fopen(inputFileNameTree, "r")) && (ff = fopen(inputFileNameFossil, "r"))) {
+	if((fi = fopen(inputFileNameTree, "r")) && (fl = fopen(inputFileNameList, "r")) && (ff = fopen(inputFileNameFossil, "r"))) {
 		TypeTree **tree;
 		TypeFossilIntFeature *fos;
-		int i;
+		TypeDistribution dist;
+		int i, sizeTree, *node;
+		char **list;
 		
+		list = readList(fl);
         tree = readTrees(fi);
         fclose(fi);
         if(tree[0] == NULL) {
@@ -280,19 +278,90 @@ int main(int argc, char **argv) {
 			tree[i]->minTimeInt.sup = minTimeIntSup;
 			tree[i]->maxTime = maxTimeIntInf;
 		}
+		for(sizeTree=0; tree[sizeTree]!=NULL; sizeTree++)
+			;
+		if(sizeTree == 0)
+			error("Error: no tree (size)\n");
+		node = (int*) malloc(sizeTree*sizeof(int));
+		for(i=0; tree[i]!=NULL; i++) {
+			int n;
+			n = getClade(list, tree[i]);
+			if(n != NOSUCH) {
+				node[sizeTree] = n;
+			} else
+				error("clade not found.\n");
+		}
 		FILE *fout, *find;
 		char nameOutput[STRING_SIZE], nameIndex[STRING_SIZE];
 		sprintf(nameOutput, "%s.out", outputPrefix);
 		sprintf(nameIndex, "%s.ind", outputPrefix);
-		
 		if((fout = fopen(nameOutput, "w")) && (find = fopen(nameIndex, "w"))) {
-			MCMCSamplingDiag(fout, find, tree, fos, al, nBurn, nGap, nSamp, prop, &windSize, &init, probSpe, probExt);
+			dist = MCMCSamplingDist(fout, find, node, tree, fos, step, al, nBurn, nGap, nSamp, prop, &windSize, &init, probSpe, probExt);
 			fclose(fout);
 			fclose(find);
 		}
+		sprintf(outputDistribution, "%s.csv", outputPrefix);
+		if((fo = fopen(outputDistribution, "w"))) {
+			if(outDens) {
+				deriveDistribution(&dist);
+				fprintDistribution(fo, dist);
+			} else
+				fprintDistribution(fo, dist);
+			fclose(fo);
+		}
+		if(dist.item != NULL)
+			free((void*)dist.item);
+		free((void*)node);
 	} else {
-		fprintf(stderr, "Cannot read %s or %s\n", inputFileNameTree, inputFileNameFossil);
+		fprintf(stderr, "Cannot read %s or %s or %s\n", inputFileNameTree, inputFileNameList, inputFileNameFossil);
 		exit(1);
 	}
 	return 0;
+}
+
+#define MAX_SIZE_TMP 50
+#define INC_BUFFER 50
+#define IS_SEP(c) (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ';')
+
+char **readList(FILE *f) {
+	char c, tmp[MAX_SIZE_TMP+1], **list;
+	int size, sizeBuffer;
+
+	sizeBuffer = INC_BUFFER;
+	list= (char**) malloc(sizeBuffer*sizeof(char*));
+	size = 0;
+	do {
+		c = getc(f);
+	} while(c!=EOF && IS_SEP(c)); 
+	while(c != EOF) {
+		int i;
+		i = 0;
+		while(i<MAX_SIZE_TMP && c !=EOF && !IS_SEP(c)) {
+			tmp[i] = c;
+			c = getc(f);
+			i++;
+		}
+		tmp[i++] = '\0';
+		if(i == MAX_SIZE_TMP) {
+			fprintf(stderr, "Ident too long (%s) ...", tmp);
+			exit(1);
+		}
+		if(i>1) {
+			if(size >= sizeBuffer) {
+				sizeBuffer += INC_BUFFER;
+				list = (char**) realloc((void *) list, sizeBuffer*sizeof(char*));
+			}
+			list[size] = (char*) malloc((strlen(tmp)+1)*sizeof(char));
+			strcpy(list[size], tmp);
+			size++;
+		}
+		while(c!=EOF && IS_SEP(c))
+			c=getc(f);
+	}
+	if(size >= sizeBuffer) {
+		sizeBuffer += INC_BUFFER;
+		list = (char**) realloc((void *) list, sizeBuffer*sizeof(char*));
+	}
+	list[size++] = NULL;
+	return list;
 }

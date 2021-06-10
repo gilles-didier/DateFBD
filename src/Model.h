@@ -13,6 +13,13 @@ typedef struct MODEL_PARAM {
 	double birth, death, fossil, sampling;
 } TypeModelParam;
 
+typedef struct EXTENDED_MODEL_PARAM {
+    double birth, death, fossil, sampling;
+    double alpha, beta, omega, delta;
+    double ab, bma, bmab, amab;
+    double bs, as;
+} TypeExtendedModelParam;
+
 typedef struct PIECEWISE_MODEL_PARAM {
 	int size;
 	double *startTime;
@@ -38,6 +45,18 @@ typedef double TypeLikelihoodEventListFunction(TypeListEvent *, TypeModelParam *
 extern "C" {
 #endif
 
+double getLogProbExtinctClade(int *clade, double *time, double maxTime, TypeExtendedModelParam *pext);
+double getLogDensClade(double val, int *clade, double *time, double maxTime, TypeExtendedModelParam *pext);
+double getLogProbClade(double val, int *clade, double *time, double maxTime, TypeExtendedModelParam *pext);
+double getQuantileClade(double q, double tol, int *clade, double *time, double maxTime, TypeExtendedModelParam *pext);
+double getQuantile(double q, double tol, double startTime, double maxTime, TypeExtendedModelParam *param);
+TypeExtendedModelParam getExtendedModelParam(TypeModelParam *param);
+double getLogProbNotObservable(double t, double maxTime, TypeExtendedModelParam *param);
+/*return the probability that a lineage alive at last startTime (e.g. last fossil age) goes extinct a time t without  leaving any fossil between startTime and  t*/
+double getLogProbExtinct(double t, double startTime, TypeExtendedModelParam *param);
+/*return the probability that a lineage alive at last startTime (e.g. last fossil age) goes extinct a time t without  leaving any fossil between startTime and  t, conditionned on the that lineage goes extinct before maxTime*/
+double getLogProbExtinctCond(double t, double startTime, double maxTime, TypeExtendedModelParam *param);
+double getLogDensExtinctCond(double t, double startTime, double maxTime, TypeExtendedModelParam *param);
 TypePiecewiseModelParam simple2piecewise(TypeModelParam *param, double startTime, double endTime);
 int getPieceIndex(double v, TypePiecewiseModelParam *param);
 void printPiecewiseModel(FILE *f, TypePiecewiseModelParam *param);

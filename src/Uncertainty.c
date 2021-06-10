@@ -2,8 +2,6 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#include <gsl/gsl_sf_gamma.h>
-#include "MyError.h"
 #include "Utils.h"
 #include "TreeExtras.h"
 #include "Uncertainty.h"
@@ -66,7 +64,7 @@ static double getLogProbTypeA(double startTime, double maxTime, int k,  TypeUnce
 static double getLogProbTypeB(double startTime, double endTime, double maxTime, int k, TypeUncertaintyLikeParameters *param);
 static double getLogProbTypeC(double startTime, double endTime, double maxTime, int k, int l, TypeUncertaintyLikeParameters *param);
 static double getLogProbTypeD(double startTime, double endTime, double maxTime, int k, TypeUncertaintyLikeParameters *param);
-static double getLogProbNotObservable(double t, double maxTime,  TypeUncertaintyLikeParameters *param);
+static double getLogProbNotObservableU(double t, double maxTime,  TypeUncertaintyLikeParameters *param);
 static void fillTableTreeIter(int n, TypeTree *tree, int *indexMin, double *K, double *T);
 static int fillBasicTree(TypeTree *basic, int n, TypeTree *tree, TypeFossilTab *ftab, int toCompute, int *newIndex);
 static TypeTree *getBasicTreeDivergence(int n, TypeTree *tree, TypeFossilTab *ftab, int *newIndex, int *root);
@@ -77,10 +75,15 @@ static TypeUncertaintyLikeDataBCD getUncertaintyLikeDataBCD(int n, double val, T
 static TypeUncertaintyLikeDataBCD joinUncertaintyLikeDataBCD(double likeOne, TypeUncertaintyLikeDataBCD d0, TypeUncertaintyLikeDataBCD d1, TypeUncertaintyLikeParameters *param);
 static void fillUncertaintyLogRankData(int node, TypeTree *tree, TypeUncertaintyLogRankData *lr);
 static double logBinomial(unsigned int k, unsigned int n);
+static double logFactorial(unsigned int n);
 static double myLog(double a,double b);
 
+double logFactorial(unsigned int n) {
+	return lgammafn((double) n+1.);
+}
+
 double logBinomial(unsigned int k, unsigned int n) {
-    return gsl_sf_lnfact(n)-(gsl_sf_lnfact(k)+gsl_sf_lnfact(n-k));
+    return logFactorial(n)-(logFactorial(k)+logFactorial(n-k));
 }
 
 void fillUncertaintyLogRankData(int node, TypeTree *tree, TypeUncertaintyLogRankData *lr) {
@@ -100,8 +103,7 @@ TypeUncertaintyLikeDataBCD joinUncertaintyLikeDataBCD(double likeOne, TypeUncert
 	int i, j, inc;
 	double *like, *offset;
 	if(d0.stopTime != d1.stopTime) {
-		fprintf(stderr, "Execution error: call of joinUncertaintyLikeDataBCD with different stop times (d0 %.2lf d1 %.2lf)\n", d0.stopTime, d1.stopTime);
-		exit(1);
+		error("Execution error: call of joinUncertaintyLikeDataBCD with different stop times (d0 %.2lf d1 %.2lf)\n", d0.stopTime, d1.stopTime);
 	}
 	if(likeOne != NEG_INFTY) {
 		res.min = 1;
@@ -240,6 +242,60 @@ void fillUncertaintyLikeData(int n, TypeTree *tree, int *indexMin, TypeUncertain
 	}
 }
 
+double getLogDensitySpecialX(double *tot, double time, int n, TypeTree *tree, TypeFossilFeature *fos, TypeModelParam *param) {
+	int index, i, j, root, *indexMin;
+	TypeTree *basicU;
+	double maxOrigin, lltot, llpart, diff, res;
+	TypeUncertaintyLikeParameters pu = getUncertaintyLikeParameters(param);
+	TypeUncertaintyLikeData *data;
+	TypeUncertaintyLogRankData *lr;
+	lltot = getLogLikelihoodTreeFossil(tree, fos, param);
+	TypeFossilTab *ftab = listToFossilTab(fos, tree->size);
+	basicU = getBasicTreeDivergence(n, tree, ftab, &index, &root);
+	for(i=0; i<basicU->size; i++)
+		if(basicU->node[i].child == NOSUCH && basicU->time[i] == NO_TIME)
+			warning("Execution warning %d %s (Uncertainty.c:197)\n", i, tree->name[i]);
+	if(basicU->parent == NULL)
+		setParent(basicU);
+	if(basicU->minTimeInt.sup != NO_TIME)
+		maxOrigin = basicU->minTimeInt.sup;
+	else
+		maxOrigin = getMinTimeTree(basicU->root, basicU, NULL);
+	indexMin = (int*) malloc(basicU->size*sizeof(int));
+	fillIndexMin(basicU->root, basicU, indexMin);
+	lr = (TypeUncertaintyLogRankData*) malloc(basicU->size*sizeof(TypeUncertaintyLogRankData));
+	fillUncertaintyLogRankData(basicU->root, basicU, lr);
+	data = (TypeUncertaintyLikeData*) malloc(basicU->size*sizeof(TypeUncertaintyLikeData));
+	fillUncertaintyLikeData(basicU->root, basicU, indexMin, lr, data, &pu);
+	if(basicU->minTimeInt.inf<maxOrigin)
+		llpart = getLogLikelihoodSubtreeRoot(basicU->minTimeInt.inf, maxOrigin, basicU->root, basicU, data, &pu);
+	else
+		llpart = getLogLikelihoodSubtree(basicU->minTimeInt.inf, basicU->root, basicU, data, &pu);
+	diff = lltot-llpart;
+	for(j=0; j<basicU->size; j++)
+		freeUncertaintyLikeData(&(data[j]));
+	((TypeNodeStatus*)basicU->info)[index] = divergenceNodeStatus;
+	double end = utils_MIN(time, maxOrigin);
+	basicU->time[index] = time;
+	fillIndexMin(tree->root, basicU, indexMin);
+	fillUncertaintyLikeData(basicU->root, basicU, indexMin, lr, data, &pu);
+	res = getLogLikelihoodSubtreeRoot(basicU->minTimeInt.inf, end, basicU->root, basicU, data, &pu)+diff;
+	for(j=0; j<basicU->size; j++)
+		freeUncertaintyLikeData(&(data[j]));
+	for(i=0; i<tree->size; i++)
+		if(ftab[i].time != NULL)
+			free((void*)ftab[i].time);
+	free((void*)ftab);
+	if(basicU->info!=NULL)
+		free((void*)basicU->info);
+	freeTree(basicU);
+	free((void*)indexMin);
+	free((void*)lr);
+	free((void*)data);
+	*tot = lltot;
+	return res;
+}
+
 //#define PRECISION_LOG_LIKE 6*log(10.)
 #define PRECISION_LOG_LIKE -5*log(10.)
 
@@ -255,7 +311,7 @@ void fillLogDistribution(TypeDistribution *logD, double *logCond, int n, TypeTre
 	basicU = getBasicTreeDivergence(n, tree, ftab, &index, &root);
 	for(i=0; i<basicU->size; i++)
 		if(basicU->node[i].child == NOSUCH && basicU->time[i] == NO_TIME)
-			fprintf(stderr, "Execution warning %d %s (Uncertainty.c:197)\n", i, tree->name[i]);
+			warning("Execution warning %d %s (Uncertainty.c:197)\n", i, tree->name[i]);
 	if(basicU->parent == NULL)
 		setParent(basicU);
 	max = getMinTimeTree(index, basicU, NULL);
@@ -406,8 +462,9 @@ TypeDistribution getDistribution(int n, double step, TypeTree *tree, TypeFossilF
 		setParent(basicU);
 	min = floor(basicU->minTimeInt.inf/step)*step;
 	max = ceil(getMinTimeTree(index, basicU, NULL)/step)*step;
-	if(min>max)
+	if(min>max) {
 		error("Error: origin time and oldest fossil age overlap.\n");
+	}
 	d.size = 1+round((max-min)/step);
 	d.item = (TypeDistributionItem*)malloc(d.size*sizeof(TypeDistributionItem));
 	indexMin = (int*) malloc(basicU->size*sizeof(int));
@@ -471,9 +528,7 @@ double getLogLikelihoodTreeFossil(TypeTree *tree, TypeFossilFeature *fos, TypeMo
     for(l=0; l<size; l++) {
 		double tmp = getLogLikelihoodSplitted(treeList[l], &pu);
 		if(isnan(tmp)) {
-			if(treeList[l] != NULL)
-				printTreeDebug(stderr, treeList[l]->root, treeList[l], NULL);
-			error("Error getLogLikelihoodTreeFossil l 532\ntime %lf %lf %lf\n", treeList[l]->minTimeInt.inf, treeList[l]->minTimeInt.sup, treeList[l]->minTime);
+			error("Error getLogLikelihoodTreeFossil  of tree %d l 532\ntime %lf %lf %lf\n", l, treeList[l]->minTimeInt.inf, treeList[l]->minTimeInt.sup, treeList[l]->minTime);
 		}
        res += tmp;
       
@@ -485,6 +540,26 @@ double getLogLikelihoodTreeFossil(TypeTree *tree, TypeFossilFeature *fos, TypeMo
     return res;
 }
 
+double getLogLikelihoodTreeFossilDebug(TypeTree *tree, TypeFossilFeature *fos, TypeModelParam *param) {
+    TypeTree **treeList;
+    int l, size;
+    double res = 0.;
+    TypeUncertaintyLikeParameters pu = getUncertaintyLikeParameters(param);
+    splitTreeFossil(tree, fos, &treeList, &size);
+
+
+    for(l=0; l<size; l++) {
+
+      res += getLogLikelihoodSplitted(treeList[l], &pu);
+
+        if(treeList[l]->info!=NULL)
+            free((void*)treeList[l]->info);
+        freeTree(treeList[l]);
+    }
+
+    free((void*)treeList);
+    return res;
+}
 
 /*get the likelihood of a tree ending at each fossil or contemporary time*/
 double getLogLikelihoodSplitted(TypeTree *tree, TypeUncertaintyLikeParameters *param) {
@@ -494,7 +569,7 @@ double getLogLikelihoodSplitted(TypeTree *tree, TypeUncertaintyLikeParameters *p
     double res;
     if(tree == NULL || tree->size == 0) {
         if(param->death>0)
-            return getLogProbNotObservable(tree->minTime, tree->maxTime, param);
+            return getLogProbNotObservableU(tree->minTime, tree->maxTime, param);
         else
             return NEG_INFTY;
     }
@@ -504,6 +579,7 @@ double getLogLikelihoodSplitted(TypeTree *tree, TypeUncertaintyLikeParameters *p
 	fillUncertaintyLogRankData(tree->root, tree, lr);
 	data = (TypeUncertaintyLikeData*) malloc(tree->size*sizeof(TypeUncertaintyLikeData));
 	fillUncertaintyLikeData(tree->root, tree, indexMin, lr, data, param);
+
 	res = getLogLikelihoodSubtreeRoot(tree->minTimeInt.inf, tree->minTimeInt.sup, tree->root, tree, data, param);
 	free((void*)indexMin);
 	for(j=0; j<tree->size; j++)
@@ -525,9 +601,9 @@ double getLogLikelihoodSubtreeRoot(double a, double b, int n, TypeTree *tree, Ty
 			for(l=0; l<data[n].dataStd.BCD.size; l++) {
 				double logLike;
 				if(b>a)
-					logLike = getLogIntProbTypeB(a, b, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min-1, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+					logLike = getLogIntProbTypeB(a, b, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min-1, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				else
-					logLike = getLogProbTypeB(a, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min-1, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+					logLike = getLogProbTypeB(a, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min-1, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				if(isinf(logLike) || isnan(logLike)) {
 					like += 0.;
 				} else {
@@ -551,9 +627,9 @@ double getLogLikelihoodSubtreeRoot(double a, double b, int n, TypeTree *tree, Ty
 			for(l=0; l<data[n].dataStd.BCD.size; l++) {
 				double logLike;
 				if(b>a)
-					logLike = getLogIntProbTypeC(a, b, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, data[n].dataStd.BCD.nLeafMin, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+					logLike = getLogIntProbTypeC(a, b, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, data[n].dataStd.BCD.nLeafMin, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				else
-					logLike = getLogProbTypeC(a, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, data[n].dataStd.BCD.nLeafMin, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+					logLike = getLogProbTypeC(a, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, data[n].dataStd.BCD.nLeafMin, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				if(isinf(logLike) || isnan(logLike)) {
 					like += 0.;
 				} else {
@@ -577,9 +653,9 @@ double getLogLikelihoodSubtreeRoot(double a, double b, int n, TypeTree *tree, Ty
 			for(l=0; l<data[n].dataStd.BCD.size; l++) {
 				double logLike;
 				if(b>a)
-					logLike = getLogIntProbTypeD(a, b, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+					logLike = getLogIntProbTypeD(a, b, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				else
-					logLike = getLogProbTypeD(a, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+					logLike = getLogProbTypeD(a, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				if(isinf(logLike) || isnan(logLike)) {
 					like += 0.;
 				} else {
@@ -601,9 +677,9 @@ double getLogLikelihoodSubtreeRoot(double a, double b, int n, TypeTree *tree, Ty
 				return NEG_INFTY;
 		case UncertaintyTypeA:
 			if(b>a)
-				return getLogIntProbTypeA(a, b, tree->maxTime, data[n].dataStd.A.numberTaxa, param)+data[n].dataStd.A.logRank-gsl_sf_lnfact(data[n].dataStd.A.numberTaxa-1);
+				return getLogIntProbTypeA(a, b, tree->maxTime, data[n].dataStd.A.numberTaxa, param)+data[n].dataStd.A.logRank-logFactorial(data[n].dataStd.A.numberTaxa-1);
 			else
-				return getLogProbTypeA(a, tree->maxTime, data[n].dataStd.A.numberTaxa, param)+data[n].dataStd.A.logRank-gsl_sf_lnfact(data[n].dataStd.A.numberTaxa-1);
+				return getLogProbTypeA(a, tree->maxTime, data[n].dataStd.A.numberTaxa, param)+data[n].dataStd.A.logRank-logFactorial(data[n].dataStd.A.numberTaxa-1);
 		case UncertaintyTypeBbase:
 			if(b>a)
 				return getLogIntProbTypeB(a, b, data[n].dataStd.BCD.stopTime, tree->maxTime, 0, param);
@@ -620,9 +696,9 @@ double getLogLikelihoodSubtreeRoot(double a, double b, int n, TypeTree *tree, Ty
 			else
 				return getLogProbTypeD(a, data[n].dataStd.BCD.stopTime, tree->maxTime, 1, param);
 		default:
-			fprintf(stderr, "\nExecution error in function getLogLikelihoodSubtreeRoot: No type while computing the likelihood of %d\n", n);
-			exit(1);
+			error("\nExecution error in function getLogLikelihoodSubtreeRoot: No type while computing the likelihood of %d\n", n);
 	}
+	return 0.0;
 }
 
 double getLogLikelihoodSubtree(double t, int n, TypeTree *tree, TypeUncertaintyLikeData *data, TypeUncertaintyLikeParameters *param) {
@@ -636,7 +712,7 @@ double getLogLikelihoodSubtree(double t, int n, TypeTree *tree, TypeUncertaintyL
 			}
 			for(l=0; l<data[n].dataStd.BCD.size; l++) {
 				double logLike;
-				logLike = getLogProbTypeB(t, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min-1, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+				logLike = getLogProbTypeB(t, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min-1, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				if(isinf(logLike) || isnan(logLike)) {
 					like += 0.;
 				} else {
@@ -659,7 +735,7 @@ double getLogLikelihoodSubtree(double t, int n, TypeTree *tree, TypeUncertaintyL
 		case UncertaintyTypeC:
 			for(l=0; l<data[n].dataStd.BCD.size; l++) {
 				double logLike;
-				logLike = getLogProbTypeC(t, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, data[n].dataStd.BCD.nLeafMin, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+				logLike = getLogProbTypeC(t, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, data[n].dataStd.BCD.nLeafMin, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				if(isinf(logLike) || isnan(logLike)) {
 					like += 0.;
 				} else {
@@ -682,7 +758,7 @@ double getLogLikelihoodSubtree(double t, int n, TypeTree *tree, TypeUncertaintyL
 		case UncertaintyTypeD:
 			for(l=0; l<data[n].dataStd.BCD.size; l++) {
 				double logLike;
-				logLike = getLogProbTypeD(t, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, param)+data[n].dataStd.BCD.like[l]-gsl_sf_lnfact(l+data[n].dataStd.BCD.min-1);
+				logLike = getLogProbTypeD(t, data[n].dataStd.BCD.stopTime, tree->maxTime, l+data[n].dataStd.BCD.min, param)+data[n].dataStd.BCD.like[l]-logFactorial(l+data[n].dataStd.BCD.min-1);
 				if(isinf(logLike) || isnan(logLike)) {
 					like += 0.;
 				} else {
@@ -703,7 +779,7 @@ double getLogLikelihoodSubtree(double t, int n, TypeTree *tree, TypeUncertaintyL
 			else
 				return NEG_INFTY;
 		case UncertaintyTypeA:
-			return getLogProbTypeA(t, tree->maxTime, data[n].dataStd.A.numberTaxa, param)+data[n].dataStd.A.logRank-gsl_sf_lnfact(data[n].dataStd.A.numberTaxa-1);
+			return getLogProbTypeA(t, tree->maxTime, data[n].dataStd.A.numberTaxa, param)+data[n].dataStd.A.logRank-logFactorial(data[n].dataStd.A.numberTaxa-1);
 		case UncertaintyTypeBbase:
 			return getLogProbTypeB(t, data[n].dataStd.BCD.stopTime, tree->maxTime, 0, param);
 		case UncertaintyTypeCbase:
@@ -711,9 +787,9 @@ double getLogLikelihoodSubtree(double t, int n, TypeTree *tree, TypeUncertaintyL
 		case UncertaintyTypeDbase:
 			return getLogProbTypeD(t, data[n].dataStd.BCD.stopTime, tree->maxTime, 1, param);
 		default:
-			fprintf(stderr, "\nExecution error in function getLogLikelihoodSubtree: No type while computing the likelihood of %d\n", n);
-			exit(1);
+			error("\nExecution error in function getLogLikelihoodSubtree: No type while computing the likelihood of %d\n", n);
 	}
+	return 0.0;
 }
 
 /*return p(k, startTime)*/
@@ -798,7 +874,7 @@ double getLogProbTypeD(double startTime, double endTime, double maxTime, int k, 
         +((double)k+1.)*(myLog(param->bs,-param->as*exp(param->omega*(maxTime-endTime)))-myLog(param->bs,-param->as*exp(param->omega*(maxTime-startTime))));
 }
 
-double getLogProbNotObservable(double t, double maxTime, TypeUncertaintyLikeParameters *param) {
+double getLogProbNotObservableU(double t, double maxTime, TypeUncertaintyLikeParameters *param) {
     return log(param->alpha)+log(param->beta)+log((1.-exp(param->omega*(maxTime-t))))-log(param->beta-param->alpha*exp(param->omega*(maxTime-t)));
 }
 
@@ -850,12 +926,10 @@ void fillTableTreeIter(int n, TypeTree *tree, int *indexMin, double *K, double *
         child[0] = tree->node[n].child;
         child[1] = tree->node[child[0]].sibling;
         if(child[1] == NOSUCH) {
-            fprintf(stderr, "Execution error: node %d with a single child\n", n);
-            exit(1);
+            error("Execution error: node %d with a single child\n", n);
         }
         if(tree->node[child[1]].sibling != NOSUCH) {
-            fprintf(stderr, "Execution error: node %d with more than 2 children\n", n);
-            exit(1);
+            error("Execution error: node %d with more than 2 children\n", n);
         }
         fillTableTreeIter(child[0], tree, indexMin, K, T);
         fillTableTreeIter(child[1], tree, indexMin, K, T);
@@ -994,8 +1068,7 @@ double getMinTimeTree(int n, TypeTree *tree, TypeFossilTab *ftab) {
 	if(tree->time[n] != NO_TIME)
 		return tree->time[n];
 	if(tree->node[n].child == NOSUCH) {
-		fprintf(stderr, "Execution error leaf %d (%s) with no time\n", n, (tree->name && tree->name[n])?tree->name[n]:"??");
-		exit(1);
+		error("Execution error leaf %d (%s) with no time\n", n, (tree->name && tree->name[n])?tree->name[n]:"??");
 	}
 	return utils_MIN(getMinTimeTree(tree->node[n].child, tree, ftab), getMinTimeTree(tree->node[tree->node[n].child].sibling, tree, ftab));
 }

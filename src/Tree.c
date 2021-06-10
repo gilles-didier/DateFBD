@@ -33,6 +33,77 @@ static void setAbsentRec(int n, int *index, TypeTree *tree);
 static int addLeavesNames(int n, TypeLexiTree *dictClad, TypeLexiTree *dictSub, int *ind, TypeTree *tree);
 static int compareTmpReorderSize(const void *a, const void *b);
 static void reorderTreeSizeRec(int *tmp, int n, TypeTree *tree);
+/*print node in newick format*/
+static void sprintNodeNewick(char *f, int n, TypeTree *tree);
+/*print ident, time and comment of node n time_name*/	
+static void sprintIdentTimeComment(char *f, int n, TypeTree *tree, TypeDisplayName display);
+
+
+
+/*print tree in newick format*/
+void sprintTreeNewick(char *f, TypeTree *tree) {
+    if(tree->size<=0)
+        return;
+    if(tree->node[tree->root].child >= 0) {
+        int tmp = tree->node[tree->root].child;
+        sprintf(f+strlen(f), "(");
+        sprintNodeNewick(f, tmp, tree);
+        for(tmp = tree->node[tmp].sibling; tmp >= 0; tmp = tree->node[tmp].sibling) {
+            sprintf(f+strlen(f), ", ");
+            sprintNodeNewick(f, tmp, tree);
+        }
+        sprintf(f+strlen(f), ")");
+    }
+    sprintIdentTimeComment(f, tree->root, tree, display_time_name);
+    sprintf(f+strlen(f), ";\n");
+}
+
+/*print node in newick format*/
+void sprintNodeNewick(char *f, int n, TypeTree *tree) {
+    if(tree->node[n].child >= 0) {
+        int tmp = tree->node[n].child;
+        sprintf(f+strlen(f), "(");
+        sprintNodeNewick(f, tmp, tree);
+        for(tmp = tree->node[tmp].sibling; tmp >= 0; tmp = tree->node[tmp].sibling) {
+            sprintf(f+strlen(f), ", ");
+            sprintNodeNewick(f, tmp, tree);
+        }
+        sprintf(f+strlen(f), ")");
+    }
+    sprintIdentTimeComment(f, n, tree, display_time_name);
+}
+
+/*print ident, time and comment of node n time_name*/	
+void sprintIdentTimeComment(char *f, int n, TypeTree *tree, TypeDisplayName display) {
+	switch(display) {
+		case display_none:
+		case display_time_none:
+			break;
+		case display_name:
+		case display_time_name:
+			if(tree->name != NULL && tree->name[n] != NULL)
+				sprintf(f+strlen(f), "%s", tree->name[n]);
+			break;
+		case display_index:
+		case display_time_index:
+			sprintf(f+strlen(f), "%d", n);
+			break;
+		case display_both:
+		case display_time_both:
+		default:
+			if(tree->name != NULL && tree->name[n] != NULL)
+				sprintf(f+strlen(f), "'%s-", tree->name[n]);
+			else
+				sprintf(f+strlen(f), "'");
+			sprintf(f+strlen(f), "%d'", n);
+			break;
+	}
+	if(display>=display_time_none &&  tree->time != NULL && tree->time[n] != NO_TIME)
+		sprintf(f+strlen(f), ":%lf", tree->time[n]);
+	if(tree->comment != NULL && tree->comment[n] != NULL)
+		sprintf(f+strlen(f), "[%s]", tree->comment[n]);
+}
+
 
 double getMinTimeFromNode(int n, TypeTree *tree) {
 	double min;
@@ -111,7 +182,6 @@ int addLeavesNames(int n, TypeLexiTree *dictClad, TypeLexiTree *dictSub, int *in
 	if(tree->node[n].child == NOSUCH) {
 		if(tree->name == NULL || tree->name[n] == NULL)
 			return 0;
-//printf("add '%s'\n", tree->name[n]);
 		if((findWordLexi(tree->name[n], dictClad) == NOSUCH) || (addWordLexi(tree->name[n], (*ind)++, dictSub) != NOSUCH)) {
 			return 0;
 		}
@@ -133,16 +203,12 @@ int getClade(char **listClad, TypeTree *tree) {
 	dictTree = newLexiTree();
 	dictSub = newLexiTree();
 	for(size=0; listClad[size]!=NULL; size++)
-		if(addWordLexi(listClad[size], size, dictClad) != NOSUCH) {
-			fprintf(stderr, "Error! duplicate identifier '%s' in list clade\n", listClad[size]);
-			exit(1);
-		}
+		if(addWordLexi(listClad[size], size, dictClad) != NOSUCH)
+			error("Error! duplicate identifier '%s' in list clade\n", listClad[size]);
 	for(n=0; n<tree->size; n++)
 		if(tree->node[n].child == NOSUCH && tree->name[n] != NULL) {
-			if(addWordLexi(tree->name[n], n, dictTree) != NOSUCH) {
-				fprintf(stderr, "Error! duplicate identifier '%s' in tree\n", tree->name[n]);
-				exit(1);
-			}
+			if(addWordLexi(tree->name[n], n, dictTree) != NOSUCH)
+				error("Error! duplicate identifier '%s' in tree\n", tree->name[n]);
 		}
 	if(tree->parent == NULL)
 		setParent(tree);
@@ -178,7 +244,7 @@ int getNodeFromName(char *name, TypeTree *tree) {
 	dict = newLexiTree();
 	for(n=0; n<tree->size; n++)
 		if(tree->name[n] != NULL && addWordLexi(tree->name[n], n, dict) != NOSUCH)
-			fprintf(stderr, "Warning! duplicate identifier '%s' in tree\n", tree->name[n]);
+			warning("Warning! duplicate identifier '%s' in tree\n", tree->name[n]);
 	res = findWordLexi(name, dict);
 	freeLexiTree(dict);
 	return res;
@@ -243,7 +309,7 @@ void fillTime(int n, double tanc, TypeTree *tree, double *min, double *max, int 
 	if(tree->time[n] == NO_TIME) {
 		double tmp = utils_MAX(tanc, min[n]);
 		if(max[n]<tanc)
-			printf("\n\nExecution problem in fillTime/Tree.c %.2lf %.2lf for node %d\n", max[n], tanc, n);
+			warning("\n\nExecution problem in fillTime/Tree.c %.2lf %.2lf for node %d\n", max[n], tanc, n);
 		if(tree->node[n].child>=0)
 			tree->time[n] = tmp+(max[n]-tmp)/((double)(2+dmax[n]));
 		else
@@ -299,11 +365,6 @@ int *removeSubtreeReturnIndex(int n, TypeTree *tree) {
     if(tree->parent == NULL)
         tree->parent = getParent(tree);
 
-    fprintf(stderr, "Supprime au noeud %d\n", n);
-    fprintTreeX(stderr, tree);
-    for(i=0; i<tree->size; i++)
-        fprintf(stderr, "p%d %d\n", i, tree->parent[i]);
-
     index = (int*) malloc(tree->size*sizeof(int));
     for(i=0; i<tree->size; i++)
         index[i] = 1;
@@ -316,31 +377,26 @@ int *removeSubtreeReturnIndex(int n, TypeTree *tree) {
             for(toSet=&(tree->node[tree->parent[n]].child); *toSet!=NOSUCH && *toSet!=n;  toSet = &(tree->node[*toSet].sibling))
                 ;
             if(*toSet != n) {
-                fprintf(stderr,"Issue A while removing  node %d (parent %d)\n", n, tree->parent[n]);
-                return NULL;
+                error("Issue A while removing  node %d (parent %d)\n", n, tree->parent[n]);
             } else
                 *toSet = tree->node[n].sibling;
         } else { //remove parent[n]
             index[tree->parent[n]] = NOSUCH;
             for(c=tree->node[tree->parent[n]].child; c!=NOSUCH && c==n; c=tree->node[c].sibling)
                 ;
-            if(c==NOSUCH) {
-                fprintf(stderr,"Issue B while removing  node %d (parent %d) - node with only one child\n", n, tree->parent[n]);
-                return NULL;
-            }
+            if(c==NOSUCH)
+                error("Issue B while removing  node %d (parent %d) - node with only one child\n", n, tree->parent[n]);
             if(tree->parent[tree->parent[n]] == NOSUCH) {
                 tree->root = c;
             } else {
                 int *toSet;
                 for(toSet=&(tree->node[tree->parent[tree->parent[n]]].child); *toSet!=NOSUCH && *toSet!=tree->parent[n];  toSet = &(tree->node[*toSet].sibling))
                     ;
-                if(*toSet != tree->parent[n]) {
-                    fprintf(stderr,"Issue C while removing  node %d (parent %d)\n", n, tree->parent[n]);
-                    return NULL;
-                } else {
+                if(*toSet != tree->parent[n]) 
+                    error("Issue C while removing  node %d (parent %d)\n", n, tree->parent[n]);
+                else {
                     tree->node[c].sibling = tree->node[tree->parent[n]].sibling;
                     *toSet = c;
-                    fprintf(stderr, "node c %d\n", c);
                     tree->parent[c] = tree->parent[tree->parent[n]];
                 }
             }
@@ -389,14 +445,6 @@ int *removeSubtreeReturnIndex(int n, TypeTree *tree) {
         if(tree->comment != NULL)
             tree->comment[i] = NULL;
     }
-//for(i=0; i<tree->size; i++)
-    //fprintf(stderr, "index[%d] = %d\n", i, index[i]);
-    //tree->root = index[tree->root];
-    //tree->size = ind;
-//fprintf(stderr, "\nAprès\n");
-//fprintTreeX(stderr, tree);
-//for(i=0; i<tree->size; i++)
-    //fprintf(stderr, "p%d %d\n", i, tree->parent[i]);
     return index;
 }
 
@@ -408,11 +456,6 @@ void removeSubtree(int n, TypeTree *tree) {
 
 /*add a new leaf from branch/node n with name n, return the index of the new leaf*/
 int addLeaf(int n, char *name, TypeTree *tree) {
-    fprintf(stderr, "Ajout au noeud %d\n", n);
-    fprintTreeX(stderr, tree);
-    int i;
-    for(i=0; i<tree->size; i++)
-        fprintf(stderr, "p%d %d\n", i, tree->parent[i]);
     if(tree->size>=tree->sizeBuf)
         reallocTree(tree->sizeBuf+INC_SIZE_TREE, tree);
     tree->node[tree->size].child = n;
@@ -426,7 +469,7 @@ int addLeaf(int n, char *name, TypeTree *tree) {
         for(toSet=&(tree->node[tree->parent[n]].child); *toSet!=NOSUCH && *toSet!=n;  toSet = &(tree->node[*toSet].sibling))
             ;
         if(*toSet != n) {
-            fprintf(stderr,"Issue A while adding new node to  %d (parent %d)\n", n, tree->parent[n]);
+            warning("Issue A while adding new node to  %d (parent %d)\n", n, tree->parent[n]);
             return NOSUCH;
         } else
             *toSet = tree->size;
@@ -451,10 +494,6 @@ int addLeaf(int n, char *name, TypeTree *tree) {
     if(tree->comment != NULL)
         tree->comment[tree->size] = NULL;
     tree->size++;
-    fprintf(stderr, "\nAprès\n");
-    fprintTreeX(stderr, tree);
-    for(i=0; i<tree->size; i++)
-        fprintf(stderr, "p%d %d\n", i, tree->parent[i]);
     return tree->size-1;
 }
 
@@ -495,22 +534,15 @@ void transfer(int m, int n, TypeTree *tree) {
     int pm = tree->parent[m], pn;
     if(pm == n)
         return;
-//fprintf(stderr, "transfert %d (parent %d) to %d (parent %d)\n", m, tree->parent[m], n, tree->parent[n]);
-//fprintf(stderr, "\nAvant\n");
-//fprintTreeX(stderr, tree);
-//int i;
-//for(i=0; i<tree->size; i++)
-    //fprintf(stderr, "p%d %d\n", i, tree->parent[i]);
     if(pm == NOSUCH)
         return;
     else { //unhang m
         int *toSet;
         for(toSet=&(tree->node[pm].child); *toSet!=NOSUCH && *toSet!=m;  toSet = &(tree->node[*toSet].sibling))
             ;
-        if(*toSet != m) {
-            fprintf(stderr,"Issue A while transfering %d (parent %d) to %d\n", m, pm, n);
-            return;
-        } else
+        if(*toSet != m)
+            warning("Issue A while transfering %d (parent %d) to %d\n", m, pm, n);
+        else
             *toSet = tree->node[m].sibling;
         if(tree->node[tree->node[pm].child].sibling == NOSUCH) { //pm has to be removed from the tree
             int ppm = tree->parent[pm];
@@ -518,18 +550,15 @@ void transfer(int m, int n, TypeTree *tree) {
                 if(tree->node[pm].child!=NOSUCH) {
                     tree->root = tree->node[pm].child;
                     tree->parent[tree->node[pm].child] = NOSUCH;
-                } else {
-                    fprintf(stderr,"Issue B while transfering %d (parent %d) to %d\n", m, pm, n);
-                    return;
-                }
+                } else
+                    warning("Issue B while transfering %d (parent %d) to %d\n", m, pm, n);
             } else {
                 int *toSet;
                 for(toSet = &(tree->node[ppm].child); *toSet!=NOSUCH && *toSet!=pm; toSet = &(tree->node[*toSet].sibling))
                     ;
-                if(*toSet != pm) {
-                    fprintf(stderr,"Issue C while transfering %d (parent %d, grand %d) to %d\n", m, pm, ppm, n);
-                    return;
-                } else {
+                if(*toSet != pm)
+                    warning("Issue C while transfering %d (parent %d, grand %d) to %d\n", m, pm, ppm, n);
+                else {
                     tree->node[tree->node[pm].child].sibling = tree->node[pm].sibling;
                     *toSet = tree->node[pm].child;
                     tree->parent[tree->node[pm].child] = ppm;
@@ -552,10 +581,9 @@ void transfer(int m, int n, TypeTree *tree) {
         int *toSet;
         for(toSet=&(tree->node[pn].child); *toSet!=NOSUCH && *toSet!=n; toSet=&(tree->node[*toSet].sibling))
             ;
-        if(*toSet != n) {
-            fprintf(stderr,"Issue D while transfering %d (parent %d) to %d  (parent %d)\n", m, pm, n, pn);
-            return;
-        } else {
+        if(*toSet != n)
+            warning("Issue D while transfering %d (parent %d) to %d  (parent %d)\n", m, pm, n, pn);
+        else {
             tree->node[pm].sibling = tree->node[n].sibling;
             *toSet = pm;
             tree->parent[pm] = pn;
@@ -564,10 +592,6 @@ void transfer(int m, int n, TypeTree *tree) {
     tree->node[pm].child = n;
     tree->node[n].sibling = m;
     tree->parent[n] = pm;
-//fprintf(stderr, "\nApres\n");
-//fprintTreeX(stderr, tree);
-//for(i=0; i<tree->size; i++)
-	//fprintf(stderr, "p%d %d\n", i, tree->parent[i]);
 }
 
 /*return 1 if m descends from n*/
@@ -796,7 +820,7 @@ char **getNamestoSpecies(char **comment, TypeTree *tree) {
     for(n=0; n<tree->size; n++) {
         name[n] = getSpecy(comment[n]);
         if(name[n] != NULL)
-            printf("%d\t%s\n", n, name[n]);
+            warning("%d\t%s\n", n, name[n]);
     }
     return name;
 }
@@ -1017,7 +1041,7 @@ void fprintTreeX(FILE *f, TypeTree *tree) {
     int n;
     fprintf(f, "root %d\n", tree->root);
     if(tree->size==0)
-        printf("Empty tree\n");
+        warning("Empty tree\n");
     else
         for(n=0; n<tree->size; n++) {
             fprintf(f, "%d", n);
@@ -1052,9 +1076,8 @@ void fixNameUnderscore(char **name, int size) {
 void fprintIdentTimeComment(FILE *f, int n, TypeTree *tree) {
     if(tree->name && tree->name[n] != NULL)
         fprintf(f, "'%s'", tree->name[n]);
-
-    else
-        fprintf(f, "'%d'", n);
+    //else
+        //fprintf(f, "'%d'", n);
     if(tree->time && tree->time[n] != NO_TIME)
         fprintf(f, ":%lf", tree->time[n]);
     if(tree->comment && tree->comment[n] != NULL)
@@ -1115,7 +1138,6 @@ void fprintNodeNewick(FILE *f, int n, TypeTree *tree) {
 /*read tree in newick format*/
 TypeTree *readTreeFromName(char *filename) {
     FILE *f;
-printf("Open %s\n", filename);
     if((f = fopen(filename, "r")))
         return readTree(f);
     else
@@ -1136,10 +1158,8 @@ TypeTree *readTree(FILE *f) {
     }
     skipSeparator(f);
     c = fgetc(f);
-    if(c != ';') {
-        printf("current caracter '%c'\n", c);
-        exitProg(ErrorReading, "error not ending by ;");
-    }
+    if(c != ';')
+        error("error not ending by ;\ncurrent caracter '%c'\n", c);
     for(c=0; c<tree->size && tree->name == NULL; c++)
         ;
     if(c == tree->size) {
@@ -1219,10 +1239,8 @@ int readNode(FILE *f, TypeTree *tree) {
         tree->name[current] = readName(f);
         tree->time[current] = readTime(f);
         tree->comment[current] = readComment(f);
-    } else {
-        printf("current caracter '%c'\n", c);
-        exitProg(ErrorReading, "unclosed parenthesis");
-    }
+    } else
+        error("unclosed parenthesis\ncurrent caracter '%c'\n", c);
     return current;
 }
 
@@ -1244,7 +1262,7 @@ int readLeaf(FILE *f, TypeTree *tree) {
 char *readName(FILE *f) {
     char c, *tmp;
     int i;
-    tmp = (char*) monmalloc((BASIC_TMP_SIZE+1)*sizeof(char));
+    tmp = (char*) malloc((BASIC_TMP_SIZE+1)*sizeof(char));
     skipSeparator(f);
     c = fgetc(f);
     if(c == '\'' || c == '"') {
@@ -1256,7 +1274,7 @@ char *readName(FILE *f) {
         if(c == '\'' || c == '"')
             c = fgetc(f);
         else
-            exitProg(ErrorExec, "Missing closing \' or \"...");
+            error("Missing closing \' or \"...");
     } else {
         for(i=0; i<BASIC_TMP_SIZE && c !=EOF && c != ':' && c != '(' && c != ')'  && c != '[' && c != ',' && c != ';'; i++) {
             tmp[i] = c;
@@ -1264,7 +1282,7 @@ char *readName(FILE *f) {
         }
     }
     if(i == BASIC_TMP_SIZE)
-        exitProg(ErrorExec, "Name too much long...");
+        error("Name too much long...");
     ungetc(c, f);
     tmp[i++] = '\0';
     removeSpaces(tmp);
@@ -1280,7 +1298,7 @@ char *readName(FILE *f) {
 char *readComment(FILE *f) {
     char c, *tmp;
     int i=0;
-    tmp = (char*) monmalloc((BASIC_TMP_SIZE+1)*sizeof(char));
+    tmp = (char*) malloc((BASIC_TMP_SIZE+1)*sizeof(char));
     skipSeparator(f);
     c = fgetc(f);
     if(c=='[') {
@@ -1290,7 +1308,7 @@ char *readComment(FILE *f) {
             c = fgetc(f);
         }
         if(i == BASIC_TMP_SIZE)
-            exitProg(ErrorExec, "comment too much long...");
+            error("comment too much long...");
     } else
         ungetc(c, f);
     tmp[i++] = '\0';
@@ -1413,7 +1431,7 @@ TypeLexiTree *getDictTree(char **name, int size) {
     for(i=0; i<size; i++)
         if(name && name[i]) {
             if(addWordLexi(name[i], i, dict)>=0)
-                printf("Warning! duplicate identifier '%s'\n", name[i]);
+                warning("Warning! duplicate identifier '%s'\n", name[i]);
         }
     return dict;
 }
@@ -1508,7 +1526,7 @@ TypeTimeTab *readTimeTab(FILE *f) {
                 res->name2 = (char**) realloc((void*) res->name2, sizeBuf*sizeof(char*));
                 res->time = (double*) realloc((void*) res->name2, sizeBuf*sizeof(double));
             }
-            tmp = (char*) monmalloc((BASIC_TMP_SIZE+1)*sizeof(char));
+            tmp = (char*) malloc((BASIC_TMP_SIZE+1)*sizeof(char));
             if(c == '\'' || c == '"') {
                 c = fgetc(f);
                 for(i=0; i<BASIC_TMP_SIZE && c != EOF && c != '\'' && c != '"'; i++) {
@@ -1524,11 +1542,11 @@ TypeTimeTab *readTimeTab(FILE *f) {
                 }
             }
             if(i == BASIC_TMP_SIZE)
-                exitProg(ErrorExec, "Name too much long...");
+                error("Name too much long...");
             tmp[i++] = '\0';
             res->name1[res->size] = (char *) realloc((void*) tmp, i*sizeof(char));
             for(; c != EOF && issep(c); c = fgetc(f));
-            tmp = (char*) monmalloc((BASIC_TMP_SIZE+1)*sizeof(char));
+            tmp = (char*) malloc((BASIC_TMP_SIZE+1)*sizeof(char));
             if(c == '\'' || c == '"') {
                 c = fgetc(f);
                 for(i=0; i<BASIC_TMP_SIZE && c != EOF && c != '\'' && c != '"'; i++) {
@@ -1544,17 +1562,17 @@ TypeTimeTab *readTimeTab(FILE *f) {
                 }
             }
             if(i == BASIC_TMP_SIZE)
-                exitProg(ErrorExec, "Name too much long...");
+                error("Name too much long...");
             tmp[i++] = '\0';
             res->name2[res->size] = (char *) realloc((void*) tmp, i*sizeof(char));
             for(; c != EOF && issep(c); c = fgetc(f));
-            tmp = (char*) monmalloc((BASIC_TMP_SIZE+1)*sizeof(char));
+            tmp = (char*) malloc((BASIC_TMP_SIZE+1)*sizeof(char));
             for(i=0; c != EOF && !issepline(c) && i<BASIC_TMP_SIZE; i++) {
                 tmp[i] = c;
                 c = fgetc(f);
             }
             if(i == BASIC_TMP_SIZE)
-                exitProg(ErrorExec, "Time too much long...");
+                error("Time too much long...");
             tmp[i++] = '\0';
             res->time[res->size] = atof(tmp);
             free((void*)tmp);
@@ -1566,27 +1584,23 @@ TypeTimeTab *readTimeTab(FILE *f) {
 
 /*read a table <leaf1>\t<leaf2>\t<time> and set the time of the lca of <leaf1> and <leaf2> to <time>*/
 void setTime(FILE *fi, char **name, TypeTree *tree) {
-    TypeLexiTree *dict;
-    TypeTimeTab *list;
-    int i, n, m;
-    dict = getDictTree(name, tree->size);
-    list = readTimeTab(fi);
-    if(tree->parent == NULL)
-        setParent(tree);
-/*	for(i=0; i<list->size; i++)
-        printf("%d\t%s\t%s\t%lf\n", i, list->name1[i], list->name2[i], list->time[i]);
-*/	for(i=0; i<list->size; i++)
-        if(((n = findWordLexi(list->name1[i], dict))>=0) && ((m = findWordLexi(list->name2[i], dict))>=0)) {
-//			printf("%d\t%d\t%d\n", m,n, getLCA(n, m, parent, tree));
-            tree->time[getLCA(n, m, tree)] = list->time[i];
-        }
-        else
-            printf("Problem with reading line %s\t%s\n", list->name1[i], list->name2[i]);
-    free((void*)list->name1);
-    free((void*)list->name2);
-    free((void*)list->time);
-    free((void*)list);
-    freeLexiTree(dict);
+	TypeLexiTree *dict;
+	TypeTimeTab *list;
+	int i, n, m;
+	dict = getDictTree(name, tree->size);
+	list = readTimeTab(fi);
+	if(tree->parent == NULL)
+		setParent(tree);
+	for(i=0; i<list->size; i++)
+		if(((n = findWordLexi(list->name1[i], dict))>=0) && ((m = findWordLexi(list->name2[i], dict))>=0)) {
+			tree->time[getLCA(n, m, tree)] = list->time[i];
+		} else
+			warning("Problem with reading line %s\t%s\n", list->name1[i], list->name2[i]);
+	free((void*)list->name1);
+	free((void*)list->name2);
+	free((void*)list->time);
+	free((void*)list);
+	freeLexiTree(dict);
 }
 
 /*prune "tree" to that can be observed from contemporary lineages only*/
@@ -1792,9 +1806,11 @@ void reindexTree(TypeTree *tree, int *index) {
 		if(tree->parent != NULL)
 			newparent[index[n]] = tree->parent[index[n]];
 		if(tree->name != NULL)
-			newname[index[n]] = tree->name[index[n]];
+//			newname[index[n]] = tree->name[index[n]];
+			newname[index[n]] = tree->name[n];
 		if(tree->comment != NULL)
-			newcomment[index[n]] = tree->comment[index[n]];
+//			newcomment[index[n]] = tree->comment[index[n]];
+			newcomment[index[n]] = tree->comment[n];
 	}
 	tree->root = index[tree->root];
 	free((void*)tree->node);
@@ -1824,4 +1840,41 @@ void fillIndexTree(int n, int *cur, TypeTree *tree, int *index) {
 	for(c=tree->node[n].child; c!=NOSUCH; c = tree->node[c].sibling)
 		fillIndexTree(c, cur, tree, index);
 }
-	
+
+/*make the set of trees 'tree' such that each node name has the same index in each of the tree, the nodes with names have the first indexes */
+void fixTreeSet(TypeTree **tree) {
+	int i, nName;
+	TypeLexiTree *dict;
+	dict = newLexiTree();
+	nName = 0;
+	for(i=0; tree[i]!=NULL; i++) {
+		int n;
+		toBinary(tree[i]);
+		if(tree[i]->name!=NULL) {
+			reorderTree(tree[i]->name, tree[i]);
+			for(n=0; n<tree[i]->size; n++) {
+				if(tree[i]->name[n]!=NULL) {
+					fixSpace(tree[i]->name[n]);
+					if(addWordLexi(tree[i]->name[n], nName, dict)<0)
+						nName++;
+				}
+			}
+		}
+	}
+	for(i=0; tree[i]!=NULL; i++) {
+		int n, *index, nNoName=nName;
+		index = (int*) malloc((tree[i]->size)*sizeof(int));
+		if(tree[i]->name!=NULL)
+			for(n=0; n<tree[i]->size; n++) {
+				if(tree[i]->name[n]!=NULL) {
+					index[n] = findWordLexi(tree[i]->name[n], dict);
+				} else
+					index[n] = nNoName++;
+			}
+		if(nNoName > tree[i]->sizeBuf)
+			reallocTree(nNoName, tree[i]);
+		reindexTree(tree[i], index);
+		reorderTree(tree[i]->name, tree[i]);
+	}
+	freeLexiTree(dict);
+}

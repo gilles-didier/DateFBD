@@ -58,6 +58,10 @@ typedef struct BASIC_FOSSIL_FEATURE {	char **name, **comment;
 	int *fossil, size, sizeBuf;
 } TypeBasicFossilFeature;
 
+typedef struct FOSSIL_FEATURE_MAX {
+	TypeFossilFeature *fos;
+    double *maxTime;
+} TypeFossilFeatureMaxTime;
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,6 +108,12 @@ void fixTreeFossil(TypeTree *tree, TypeFossilFeature *fos);
 TypeTree *pruneFossilBis(TypeTree *tree,  TypeFossilFeature *fos);
 void fixFossilOrder(TypeFossilFeature* sample, int size);
 void printFossilDebug(FILE *f, TypeFossilFeature* sample, int size);
+/*fill the table maxTime where entry n the most recent time of the clade n*/
+void fillMaxTime(int n, TypeTree *tree, double *maxTime);
+TypeTree *fixBinaryFossilBis(TypeTree *tree,  TypeFossilFeature *fos, double *maxTime);
+/*prune "tree" to that can be observed from contemporary lineages and fossil finds*/
+TypeTree *pruneFossilTer(TypeTree *tree,  TypeFossilFeature *fos);
+double getMaxFossilTimeToNode(int n, TypeTree *tree, TypeFossilFeature* feat);
 
 #ifdef __cplusplus
 }

@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <math.h>
-#include <gsl/gsl_sf_gamma.h>
-#include "Model.h"
+
+#include "Utils.h"
 #include "TreeExtras.h"
+#include "Model.h"
 
 typedef struct MODEL_COEFF_BD {
     double birth, death;
@@ -31,9 +32,24 @@ static double logDensWaitBD(double s, double e, double maxTime, int n, TypeModel
 static double logDistWaitBD(double s, double e, double maxTime, int n, TypeModelCoeffBD *coeff);
 static double log_q_Stadler(double t, double c1, double c2, TypeModelParam *param);
 static double log_p0_Stadler(double t, double c1, double c2, TypeModelParam *param);
-//static int fillSplitTreeFossilModel(TypeTree *tcur, int n, TypeTree *tree, TypeFossilTab *ftab, TypeTree **treeList, int *size);
-//static void splitTreeFossilModel(TypeTree *tree, TypeFossilFeature *fos, TypeTree ***treeList, int *size);
+static double logSumLog(double a, double b);
 
+/*return log(exp(a)+exp(b)) in an accurate way*/
+double logSumLog(double a, double b) {
+	double max, min;
+	if(a == NEG_INFTY)
+		return b;
+	if(b == NEG_INFTY)
+		return a;
+	if(a>b) {
+		max = a;
+		min = b;
+	} else {
+		min = a;
+		max = b;
+	}
+	return max + log1p(exp(min-max));
+}
 
 TypePiecewiseModelParam simple2piecewise(TypeModelParam *param, double startTime, double endTime) {
 	TypePiecewiseModelParam res;
@@ -48,14 +64,10 @@ TypePiecewiseModelParam simple2piecewise(TypeModelParam *param, double startTime
 
 int getPieceIndex(double v, TypePiecewiseModelParam *param) {
 	int a = 0, b = param->size, c;
-	if(v<param->startTime[0]) {
-		fprintf(stderr, "Error in 'getPieceIndex': value %.2lf too small (start time = %.2lf)\n", v, param->startTime[0]);
-		return 0;
-	}
-	if(v>param->startTime[param->size]) {
-		fprintf(stderr, "Error in 'getPieceIndex': value %.2lf too high (end time = %.2lf)\n", v, param->startTime[param->size]);
-		return param->size-1;
-	}
+	if(v<param->startTime[0])
+		error("Error in 'getPieceIndex': value %.2lf too small (start time = %.2lf)\n", v, param->startTime[0]);
+	if(v>param->startTime[param->size])
+		error("Error in 'getPieceIndex': value %.2lf too high (end time = %.2lf)\n", v, param->startTime[param->size]);
 	while(b > a+1) {
 		c = (a+b)/2;
 		if(param->startTime[c] < v)
@@ -73,6 +85,101 @@ void printPiecewiseModel(FILE *f, TypePiecewiseModelParam *param) {
 	for(i=0; i<param->size; i++)
 		fprintf(f, "%lf\n%lf %lf %lf %lf\n", param->startTime[i], param->param[i].birth, param->param[i].death, param->param[i].fossil, param->param[i].sampling);
 	fprintf(f, "%lf\n", param->startTime[param->size]);
+}
+
+TypeExtendedModelParam getExtendedModelParam(TypeModelParam *param) {
+	TypeExtendedModelParam res;
+	res.birth = param->birth;
+	res.death = param->death;
+	res.fossil = param->fossil;
+	res.sampling = param->sampling;
+	res.delta = pow(res.birth+res.death+res.fossil, 2.)-4.*res.birth*res.death;
+	res.alpha = (res.birth+res.death+res.fossil-sqrt(res.delta))/(2*res.birth);
+	res.beta = (res.birth+res.death+res.fossil+sqrt(res.delta))/(2*res.birth);
+	res.bma = sqrt(res.delta)/res.birth;
+	res.omega = -sqrt(res.delta);
+	res.ab = res.death/res.birth;
+	res.bmab = (res.birth-res.death+res.fossil+sqrt(res.delta))/(2*res.birth);
+	res.amab = (res.birth-res.death+res.fossil-sqrt(res.delta))/(2*res.birth);
+	res.bs = res.beta-1.+res.sampling;
+	res.as = res.alpha-1.+res.sampling;
+	return res;
+}
+
+double getLogProbNotObservable(double t, double maxTime, TypeExtendedModelParam *param) {
+    return log(param->death)-log(param->birth)+log((1.-exp(param->omega*(maxTime-t))))-log(param->beta-param->alpha*exp(param->omega*(maxTime-t)));
+}
+
+/*return the probability density that a lineage alive at last startTime (e.g. last fossil age) goes extinct a time t without  leaving any fossil between startTime and  t*/
+double getLogProbExtinct(double t, double startTime, TypeExtendedModelParam *param) {
+    return log(param->death)+log(param->delta)-2.*log(param->birth)+param->omega*(t-startTime)-2.*log(param->beta-param->alpha*exp(param->omega*(t-startTime)));
+}
+
+/*return the probability that a lineage alive at last startTime (e.g. last fossil age) goes extinct a time t without  leaving any fossil between startTime and  t, conditionned on the that lineage goes extinct before maxTime*/
+double getLogDensExtinctCond(double t, double startTime, double maxTime, TypeExtendedModelParam *param) {
+    return log(param->delta)-log(param->birth)+param->omega*(t-startTime)-2.*log(param->beta-param->alpha*exp(param->omega*(t-startTime)))-log(1.-exp(param->omega*(maxTime-startTime)))+log(param->beta-param->alpha*exp(param->omega*(maxTime-startTime)));
+}
+
+/*return the probability that a lineage alive at last startTime (e.g. last fossil age) goes extinct a time t without  leaving any fossil between startTime and  t, conditionned on the that lineage goes extinct before maxTime*/
+double getLogProbExtinctCond(double t, double startTime, double maxTime, TypeExtendedModelParam *param) {
+    return log(1.-exp(param->omega*(t-startTime)))-log(param->beta-param->alpha*exp(param->omega*(t-startTime)))-log(1.-exp(param->omega*(maxTime-startTime)))+log(param->beta-param->alpha*exp(param->omega*(maxTime-startTime)));
+}
+
+double getQuantile(double q, double tol, double startTime, double maxTime, TypeExtendedModelParam *param) {
+	double a, b;
+	a = startTime;
+	b = maxTime;
+	while(b-a>tol) {
+		double m = (a+b)/2.;
+		if(exp(getLogProbExtinctCond(m, startTime, maxTime, param))>q)
+			b = m;
+		else
+			a = m;
+	}
+	return (a+b)/2.;
+}
+
+double getLogProbExtinctClade(int *clade, double *time, double maxTime, TypeExtendedModelParam *pext) {
+	int i;
+	double logProb = 0.;
+	for(i=0; clade[i] != END_LIST_INT; i++) 
+		logProb += getLogProbNotObservable(time[clade[i]], maxTime, pext);
+	return logProb;
+}
+
+double getLogProbClade(double val, int *clade, double *time, double maxTime, TypeExtendedModelParam *pext) {
+	int i;
+	double logProb = 0.;
+	for(i=0; clade[i] != END_LIST_INT; i++) 
+		logProb += getLogProbExtinctCond(val, time[clade[i]], maxTime, pext);
+	return logProb;
+}
+
+double getLogDensClade(double val, int *clade, double *time, double maxTime, TypeExtendedModelParam *pext) {
+	int i;
+	double logProb, logDens = NEG_INFTY;
+	logProb = getLogProbClade(val, clade, time, maxTime, pext);
+	for(i=0; clade[i] != END_LIST_INT; i++)
+		logDens = logSumLog(logDens, logProb+log(pext->delta)-log(pext->birth)+pext->omega*(val-time[clade[i]])-2.*log(pext->beta-pext->alpha*exp(pext->omega*(val-time[clade[i]])))-(log(1.-exp(pext->omega*(val-time[clade[i]])))-log(pext->beta-pext->alpha*exp(pext->omega*(val-time[clade[i]])))));
+	return logDens;
+}
+
+double getQuantileClade(double q, double tol, int *clade, double *time, double maxTime, TypeExtendedModelParam *pext) {
+	double a, b;
+	int i;
+	a = time[clade[0]];
+	for(i=0; clade[i] != END_LIST_INT; i++)
+		if(time[clade[i]]>a)
+			a = time[clade[i]];
+	b = maxTime;
+	while(b-a>tol) {
+		double m = (a+b)/2.;
+		if(exp(getLogProbClade(m, clade, time, maxTime, pext))>q)
+			b = m;
+		else
+			a = m;
+	}
+	return (a+b)/2.;	
 }
 
 TypeModelCoeffFBD getModelCoeffFBD(TypeModelParam *param) {
@@ -258,8 +365,7 @@ TypeListEvent *getEventSequenceFBD(TypeTree *tree, TypeFossilFeature *fos) {
 				res->list[res->size].n = ncur;
 				if(tree->node[cur[which]].child>=0 && tree->node[tree->node[cur[which]].child].sibling>=0) {
 					if(ncur >= MAX_CURRENT) {
-						printf("too much lineages in counting events");
-						exit(EXIT_FAILURE);
+						error("too much lineages in counting events");
 					}
 					res->list[res->size].type = 'b';
 					(res->size)++;
@@ -294,12 +400,8 @@ TypeListEvent *getEventSequenceBD(TypeTree *tree) {
 
 	res = (TypeListEvent*) malloc(sizeof(TypeListEvent));
 	res->size = 0;
-	if(tree == NULL || tree->size == 0) {
-		fprintf(stderr, "Empty tree\n");
-		exit(1);
-		res->list = NULL;
-		return res;
-	}
+	if(tree == NULL || tree->size == 0)
+		error("Empty tree\n");
 	res->list = (TypeEvent*) malloc(nbuf*sizeof(TypeEvent));
 	if(tree->time[tree->root] == tree->minTime) {
 		if(tree->node[tree->root].child != NOSUCH) {
@@ -347,19 +449,15 @@ TypeListEvent *getEventSequenceBD(TypeTree *tree) {
 			res->list[res->size].n = ncur;
 			if(tree->node[cur[which]].child != NOSUCH) {
 				if(tree->node[tree->node[cur[which]].child].sibling != NOSUCH) {
-					if(ncur >= MAX_CURRENT) {
-						printf("too much lineages in counting events");
-						exit(EXIT_FAILURE);
-					}
+					if(ncur >= MAX_CURRENT)
+						error("too much lineages in counting events");
 					res->list[res->size].type = 'b';
 					(res->size)++;
 					cur[ncur] = tree->node[tree->node[cur[which]].child].sibling;
 					cur[which] = tree->node[cur[which]].child;
 					ncur++;
-				} else {
-					fprintf(stderr, "Execution error: node %d with a single child\n", cur[which]);
-					exit(1);
-				}
+				} else
+					error("Execution error: node %d with a single child\n", cur[which]);
 			} else {
 				res->list[res->size].type = 'd';
 				(res->size)++;

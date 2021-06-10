@@ -1,5 +1,5 @@
-#ifndef MyErrorF
-#define MyErrorF
+#ifndef MyRF
+#define MyRF
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,6 +7,8 @@ extern "C" {
 
 void error(const char * format, ...);
 void warning(const char * format, ...);
+double lgammafn(double x);
+double unif_rand();
 
 #ifdef __cplusplus
 }

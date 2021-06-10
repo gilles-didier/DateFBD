@@ -122,12 +122,10 @@ int main(int argc, char **argv) {
 					fscanNLoptOptionTag(fopt, &nloptOption);
 					fclose(fopt);
 				} else {
-					fprintf(stderr, "Can't open file %s\n", argv[++i]);
-					exit(EXIT_FAILURE);
+					error("Can't open file %s\n", argv[++i]);
 				}
 			} else {
-				fprintf(stderr, "File name missing after option -o\n");
-				exit(EXIT_FAILURE);
+				error("File name missing after option -o\n");
 			}
 		}
 		if(option['o']) {
@@ -135,7 +133,7 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &minTimeIntInf) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "at least one value is expected after -o");
+				error("at least one value is expected after -o");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &minTimeIntSup) == 1)
 				i++;
 			else
@@ -146,7 +144,7 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &maxTimeIntInf) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "at least one value is expected after -o");
+				error("at least one value is expected after -o");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &maxTimeIntSup) == 1)
 				i++;
 			else
@@ -157,32 +155,29 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &nSamp) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "A number expected after -p");
+				error("A number expected after -p");
 		}
 		if(option['t']) {
 			option['t'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &maxT) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is required after option -t");
+				error("a number is required after option -t");
 		}
 		if(option['h']) {
 			option['h'] = 0;
-			printf("%s\n", HELPMESSAGE);
-			exit(0);
+			error("%s\n", HELPMESSAGE);
 		}
 	}
 	if(i<argc) {
 		inputFileNameTree = argv[i++];
 	} else {
-		fprintf(stderr, "Please provide the name of a file containing a phylogenetic tree in Newick format\n");
-		exit(1);
+		error("Please provide the name of a file containing a phylogenetic tree in Newick format\n");
 	}
 	if(i<argc) {
 		inputFileNameFossil = argv[i++];
 	} else {
-		fprintf(stderr, "Please provide the name of a file containing a fossil list\n");
-		exit(1);
+		error("Please provide the name of a file containing a fossil list\n");
 	}
 	if(i<argc)
 		outputFileName = argv[i++];
@@ -196,8 +191,7 @@ int main(int argc, char **argv) {
 		tree = readTrees(fi);
 		fclose(fi);
 		if(tree[0] == NULL) {
-			fprintf(stderr, "Error: no tree\n");
-			exit(1);
+			error("Error: no tree\n");
 		}
 		for(sizeTree=0; tree[sizeTree]!=NULL; sizeTree++) {
 			if(tree[sizeTree]->name!=NULL)
@@ -261,7 +255,7 @@ fprintf(stdout, "\rSampling %d/%d", s, nSamp); fflush(stdout);
 								treeTmp->time[n] = maxTmp;
 							break;
 							default:
-								fprintf(stderr, "Node %d has no status\n", n);
+								error("Node %d has no status\n", n);
 								return 1;
 						}
 					} else
@@ -336,11 +330,11 @@ fprintf(stdout, "\rSampling %d/%d", s, nSamp); fflush(stdout);
 			fprintReport(fo, mean, std, nloptOption);
 			fclose(fo);
 		} else {
-			fprintf(stderr, "Cannot open %s\n", outputFileName);
+			error("Cannot open %s\n", outputFileName);
 			exit(1);
 		}
 	} else {
-		fprintf(stderr, "Cannot read %s or %s\n", inputFileNameTree, inputFileNameFossil);
+		error("Cannot read %s or %s\n", inputFileNameTree, inputFileNameFossil);
 		exit(1);
 	}
 	return 0;
@@ -348,7 +342,7 @@ fprintf(stdout, "\rSampling %d/%d", s, nSamp); fflush(stdout);
 
 void *threadEstimateParameters(void *data) {
 	if(!minimizeBirthDeathFossilFromTreeFossil(getLogLikelihoodTreeFossil, ((TypeThreadParameter*)data)->tree, ((TypeThreadParameter*)data)->ffe, ((TypeThreadParameter*)data)->nloptOption, ((TypeThreadParameter*)data)->estim)) {
-		fprintf(stderr, "Estimation issue\n");
+		error("Estimation issue\n");
 		((TypeThreadParameter*)data)->estim->param.birth = sqrt(-1.);
 	}
 	freeTree(((TypeThreadParameter*)data)->tree);

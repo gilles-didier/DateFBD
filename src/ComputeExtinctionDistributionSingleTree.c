@@ -20,6 +20,7 @@
 #include "DrawTreeGeneric.h"
 #include "DrawFossilInt.h"
 #include "DrawDensity.h"
+#include "DrawTimePosition.h"
 #include "MCMCImportanceSampling.h"
 
 #ifdef DO_PS
@@ -53,28 +54,23 @@
 
 #define HELPMESSAGE "\n\nusage: Distribution [options] <input file> [<output file>]\n\nEstimate the diversification rates of the tree contained in the input file.\nThe input file has to be in Newick format with special tags for fossils ages and origin and end of the diversification, \nit returns a text report with the estimates.\n\nOptions are:\n\t-o <options file name>\tload the settings of the optimizer. <options file name> has to be in the format:\n\t\t:SPE [0;1] :EXT [0;1] :FOS [0:1] :TRI 10 :TOL 1.E-7 :ITE 500\n\t-h\tdisplay help\n\n"
 
-//./disp -o -360 -315 -p 0.18 0.17 0.04 -e -s 100 -d 500 Amniota.txt ../data/Cotylosauria100trees.phy ../data/CotylosauriaAges.csv 
-//./disx -o -360 -319 -p 1.668294E-01 1.666746E-01 3.939457E-02 -s 2000 -t 8 -d 100 -e Amniota.txt ../data/Cotylosauria100trees.phy ../data/CotylosauriaAges.csv cotySTA3.csv
-//./disx -o -360 -319 -p 1.668294E-01 1.666746E-01 3.939457E-02 -s 500 -t 40 -d 0.1 -f 6 -e ../data/Cotylosauria100trees.phy ../data/CotylosauriaAges.csv cotySTA3M10000E
-
 typedef struct DATA_DRAW_FOSSIL_DENSITY {
 	TypeDataDrawFossilInt *dataFossil;
 	TypeDataDrawDensity *dataDensity;
 } TypeDataDrawFossilDensity;
 
 
-void drawFossilDensity(int n , double x, double y, TypeInfoDrawTreeGeneric *info, void *data) {
+void drawFossilDensity(int n, double x, double y, TypeInfoDrawTreeGeneric *info, void *data) {
 	drawFossilInt(n, x, y, info, (void*) ((TypeDataDrawFossilDensity*)data)->dataFossil);
 	drawDensity(n, x, y, info, (void*) ((TypeDataDrawFossilDensity*)data)->dataDensity);
 }
 
 
-
 int main(int argc, char **argv) {	
 	char *inputFileNameTree, *inputFileNameFossil = NULL, *outputPrefix = PREFIX, outputDistribution[STRING_SIZE], option[256], format = '1';
 	FILE *fi, *fo;
-	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, node = NOSUCH, outDens = 1, maxT = 2, *todo, tab_todo[MAX_NODE], nTodo=0;
-	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., maxTimeIntSup = 0., step = 0.1, treeScaleStep=10., al = 0.75, prop = 0.25, probSpe = 0.33, probExt = 0.33;
+	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, node = NOSUCH, maxT = 2, *todo, tab_todo[MAX_NODE], nTodo=0;
+	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., maxTimeIntSup = 0., step = 0.1, treeScaleStep=10., al = 0.75, prop = 0.25, probSpe = 0.33, probExt = 0.33, maxDisplayTime = 0., figwidth = 100.;
 	TypeModelParam param = {.birth=1.3, .death = 1., .fossil = 1., .sampling = 1.}, windSize = {.birth=0.1, .death = 0.1, .fossil = 0.02, .sampling = 1.}, init = {.birth=0.5, .death = 0.5, .fossil = 0.1, .sampling = 1.};
 
 	
@@ -89,7 +85,7 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%c", &format) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a character is required after option -f");
+				error("a character is required after option -f");
 		}
 		if(option['z']) {
 			option['z'] = 0;
@@ -132,7 +128,7 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &minTimeIntInf) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "at least one value is expected after -o");
+				error("at least one value is expected after -o");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &minTimeIntSup) == 1)
 				i++;
 			else
@@ -143,15 +139,15 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &(param.birth)) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -p");
+				error("3 values are expected after -p");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &(param.death)) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -p");
+				error("3 values are expected after -p");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &(param.fossil)) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -p");
+				error("3 values are expected after -p");
 
 		}
 		if(option['a']) {
@@ -159,80 +155,76 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &probSpe) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "2 values are expected after -a");
+				error("2 values are expected after -a");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &probExt) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "2 values are expected after -a");
+				error("2 values are expected after -a");
 		}
 		if(option['f']) {
 			option['f'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &prop) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is required after option -t");
+				error("a number is required after option -t");
 		}
 		if(option['w']) {
 			option['w'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &windSize.birth) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -a");
+				error("3 values are expected after -a");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.death) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -a");
+				error("3 values are expected after -a");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &windSize.fossil) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -a");
+				error("3 values are expected after -a");
 		}
 		if(option['i']) {
 			option['i'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &init.birth) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -a");
+				error("3 values are expected after -a");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.death) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -a");
+				error("3 values are expected after -a");
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &init.fossil) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "3 values are expected after -a");
+				error("3 values are expected after -a");
 		}
 		if(option['q']) {
 			option['q'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &treeScaleStep) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is required after option -t");
-		}
-		if(option['e']) {
-			option['e'] = 0;
-			outDens = 0;
+				error("a number is required after option -t");
 		}
 		if(option['s']) {
 			option['s'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &nSamp) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is expected after -s");
+				error("a number is expected after -s");
 		}
 		if(option['b']) {
 			option['b'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &nBurn) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is expected after -b");
+				error("a number is expected after -b");
 		}
 		if(option['g']) {
 			option['g'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &nGap) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is expected after -b");
+				error("a number is expected after -b");
 		}
 		if(option['n']) {
 			option['n'] = 0;
@@ -244,35 +236,49 @@ int main(int argc, char **argv) {
 				}
 				i++;
 			} else
-				exitProg(ErrorArgument, "a node index are expected after -n");
+				error("a node index are expected after -n");
 		}
 		if(option['d']) {
 			option['d'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &(step)) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is expected after -d");
+				error("a number is expected after -d");
+		}
+		if(option['m']) {
+			option['m'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &(maxDisplayTime)) == 1)
+				i++;
+			else
+				error("a number is expected after -m");
 		}
 		if(option['l']) {
 			option['l'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &al) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is expected after -l");
+				error("a number is expected after -l");
 		}
 		if(option['u']) {
 			option['u'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &(step)) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is expected after -u");
+				error("a number is expected after -u");
 		}
 		if(option['t']) {
 			option['t'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%d", &maxT) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a number is required after option -t");
+				error("a number is required after option -t");
+		}
+		if(option['y']) {
+			option['y'] = 0;
+			if((i+1)<argc && sscanf(argv[i+1], "%lf", &figwidth) == 1)
+				i++;
+			else
+				error("a number is required after option -t");
 		}
 		if(option['h']) {
 			option['h'] = 0;
@@ -301,6 +307,8 @@ int main(int argc, char **argv) {
 		int i, n;
 		TypeInfoDrawTreeGeneric info;
 		TypeAdditionalDrawTreeGeneric add;
+		TypeAdditionalDrawTreeGenericGeneral addG;
+		TypeDataDrawTimePosition timePos;
 		TypeDataDrawFossilInt data;
 		TypeDataDrawDensity dataD;
 		TypeDataDrawFossilDensity dataFD;
@@ -329,11 +337,14 @@ printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 			todo = tab_todo;
 		else {
 			int n;
-			todo = (int*) malloc(sizeof(int)*tree->size/2);
+			todo = (int*) malloc(sizeof(int)*(tree->size/2+2));
 			for(n=0; n<tree->size; n++)
-				if(tree->node[n].child != NOSUCH)
+				if(tree->node[n].child == NOSUCH && fos->status[n] == extinctNodeStatus) {
 					todo[nTodo++] = n;
+//printf("leaf %d %s\n", n, tree->name[n]);
+				}
 		}
+		todo[nTodo] = NOSUCH;
 		for(n=0; n<tree->size; n++)
 			if(tree->node[n].child != NOSUCH)
 				tree->time[n] = NO_TIME;
@@ -367,23 +378,27 @@ printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 		tree->maxTimeInt.sup = maxTimeIntSup;
 		if(tree->parent==NULL)
 			tree->parent = getParent(tree);
-		d = MCMCSamplingMultipleDistSingleTree(todo, nTodo, tree, fos, step, al, nBurn, nGap, nSamp, prop, &windSize, &init, probSpe, probExt);
+		d = MCMCSamplingExtinctionMultipleDistSingleTree(todo, nTodo, maxDisplayTime, tree, fos, step, al, nBurn, nGap, nSamp, prop, &windSize, &init, probSpe, probExt);
 		for(n=0; n<nTodo; n++) {
-			tree->time[todo[n]] = getMedian(d[todo[n]]);
-			sprintf(outputDistribution, "%s_%d.csv", outputPrefix, todo[n]);
+			if(tree->name[todo[n]] != NULL)
+				sprintf(outputDistribution, "%s_%s.csv", outputPrefix, tree->name[todo[n]]);
+			else
+				sprintf(outputDistribution, "%s_%d.csv", outputPrefix, todo[n]);
 			if((fo = fopen(outputDistribution, "w"))) {
-				if(outDens) {
-					deriveDistribution(&(d[todo[n]]));
-					fprintDistribution(fo, d[todo[n]]);
-				} else
-					fprintDistribution(fo, d[todo[n]]);
+				fprintDistribution(fo, d[todo[n]]);
 				fclose(fo);
 			}
-//			fprintf(stdout, "Median %.2lf\nMean %.2lf\nMode %.2lf\nQuantile Inf %.2lf\nQuantile sup %.2lf\n", getMedian(d[todo[n]]), getMean(d[todo[n]]), getMode(d[todo[n]]), getQuantileInf(d[todo[n]], 0.025), getQuantileSup(d[todo[n]], 0.025));
+			printf("sum %s %lf\t%lf\t%lf\n", tree->name[todo[n]], sumDistribution(d[todo[n]]), sumTrapezeDistribution(d[todo[n]]), sumSimpsonDistribution(d[todo[n]]));
 		}
-		fprintf(stdout,"\nplot '%s_%d.csv' using 1:2 with lines title '%s %d' lw 3", outputPrefix, todo[0], "node", todo[0]);
+		if(tree->name[todo[0]] != NULL)
+			fprintf(stdout,"\nplot '%s_%s.csv' using 1:2 with lines title '%s' lw 3", outputPrefix, tree->name[todo[0]], tree->name[todo[0]]);
+		else
+			fprintf(stdout,"\nplot '%s_%d.csv' using 1:2 with lines title '%s %d' lw 3", outputPrefix, todo[0], "node", todo[0]);
 		for(n=1; n<nTodo; n++)
-			fprintf(stdout,", '%s_%d.csv' using 1:2 with lines title '%s %d' lw 3", outputPrefix, todo[n], "node", todo[n]);
+			if(tree->name[todo[n]] != NULL)
+				fprintf(stdout,", '%s_%s.csv' using 1:2 with lines title '%s' lw 3", outputPrefix, tree->name[todo[n]], tree->name[todo[n]]);
+			else
+				fprintf(stdout,", '%s_%d.csv' using 1:2 with lines title '%s %d' lw 3", outputPrefix, todo[n], "node", todo[n]);
 		fprintf(stdout,"\n");
 		if(format != '0') {
 			char *tmp, outputFileNameG[SIZE_BUFFER_CHAR], *outputFileName;
@@ -416,10 +431,10 @@ printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 			if((tmp = strrchr(outputFileName, '.')) != NULL)
 				tmp[0] = '\0';
 			info.param.tmin = tree->minTime;
-			info.param.tmax = tree->maxTime;
+			info.param.tmax = maxDisplayTime;
 			info.param.ratio = 0.55;
+			info.param.width = figwidth;
 			info.param.scaleStep = treeScaleStep;
-//			data.color = (TypeRGB) {.red = 1., .green = 1., .blue = 0.};
 			data.color = (TypeRGB) {.red = 0.63, .green = 0.32, .blue = 0.18};
 			data.radius = 5.;
 			data.alpha = 0.5;
@@ -431,8 +446,13 @@ printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 			dataFD.dataDensity = &dataD;
 			add.data = &dataFD;
 			add.draw = drawFossilDensity;
+			timePos.color = (TypeRGB) {.red = 0., .green = 0., .blue = 1.};
+			timePos.alpha = 0.25;
+			timePos.pos.start = -272.3;
+			timePos.pos.end = -272.3;
+			addG.data = &timePos;
+			addG.draw= drawTimePosition;
 			tree->maxTime = getMaximumTime(tree);
-//printf("min %.2lf %s\n", tree->minTime, sprintRGBTikz(buffer, dataD.color));
 			if(d[tree->root].size>0) {
 				int i;
 				for(i=0; i<d[tree->root].size && d[tree->root].item[i].dens<0.001; i++)
@@ -446,42 +466,48 @@ printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 					setFunctPDF(&(info.funct));
 					data.drawLineDot = drawLineDotCairo;
 					dataD.fillPolygon = fillPolygonCairo;
-					drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+					timePos.fillPolygon = fillPolygonCairo;
+					drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 					break;
 				case '2':
 					sprintf(outputFileNameG, "%s_tree.ps", outputFileName);
 					setFunctPS(&(info.funct));
 					data.drawLineDot = drawLineDotCairo;
 					dataD.fillPolygon = fillPolygonCairo;
-					drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+					timePos.fillPolygon = fillPolygonCairo;
+					drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 					break;
 				case '3':
 					sprintf(outputFileNameG, "%s_tree.png", outputFileName);
 					setFunctPNG(&(info.funct));
 					data.drawLineDot = drawLineDotCairo;
 					dataD.fillPolygon = fillPolygonCairo;
-					drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+					timePos.fillPolygon = fillPolygonCairo;
+					drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 					break;
 				case '4':
 					sprintf(outputFileNameG, "%s_tree.svg", outputFileName);
 					setFunctSVG(&(info.funct));
 					data.drawLineDot = drawLineDotCairo;
 					dataD.fillPolygon = fillPolygonCairo;
-					drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+					timePos.fillPolygon = fillPolygonCairo;
+					drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 					break;
 				case '5':
 					sprintf(outputFileNameG, "%s_tree_pst.tex", outputFileName);
 					setFunctPSTricks(&(info.funct));
 					data.drawLineDot = drawLineDotPSTricks;
 					dataD.fillPolygon = fillPolygonPSTricks;
-					drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+					timePos.fillPolygon = fillPolygonPSTricks;
+					drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 					break;
 				case '6':
 					sprintf(outputFileNameG, "%s_tree_tikz.tex", outputFileName);
 					setFunctTikz(&(info.funct));
 					data.drawLineDot = drawLineDotTikz;
 					dataD.fillPolygon = fillPolygonTikz;
-					drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+					timePos.fillPolygon = fillPolygonTikz;
+					drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 					break;
 				default:
 					;

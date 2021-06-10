@@ -47,6 +47,7 @@ typedef struct TMP_FOSSIL_INT_ITEM {
 #ifdef __cplusplus
 extern "C" {
 #endif
+double getFossilIntMaxInfTime(TypeFossilIntFeature* feat);
 double getFirstFossilIntTimeFromNode(int n, TypeTree *tree, TypeFossilIntFeature* feat);
 double getMidFossilIntTimeFromNode(int n, TypeTree *tree, TypeFossilIntFeature* feat);
 /*index[i] is the new index of former index i (NOSUCH if removed)*/

@@ -2,12 +2,9 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#include <gsl/gsl_sf_gamma.h>
 #include "Utils.h"
 #include "TreeExtras.h"
 
-
-//#define binomial(k,n) (gsl_sf_fact((unsigned int) n)/(gsl_sf_fact(((unsigned int) k))*gsl_sf_fact(((unsigned int) n-k))))
 
 
 
@@ -18,15 +15,17 @@ typedef struct TREE_RANKING {
 
 TypeTreeRanking logNumberRankingsRec(int n, TypeTree *tree);
 TypeTreeRanking logNumberOrdersRec(int n, TypeTree *tree);
+
 static double binomial(unsigned int k, unsigned int n);
 static double logBinomial(unsigned int k, unsigned int n);
+
 
 double binomial(unsigned int k, unsigned int n) {
     return exp(logBinomial(k,n));
 }
 
 double logBinomial(unsigned int k, unsigned int n) {
-    return gsl_sf_lnfact(n)-(gsl_sf_lnfact(k)+gsl_sf_lnfact(n-k));
+    return lgammafn(n-1)-(lgammafn(k-1)+lgammafn(n-k-1));
 }
 
 
@@ -49,7 +48,7 @@ double logProbTreeShape(TypeTree *tree) {
 
 double logProbSubTreeShape(int n, TypeTree *tree) {
     TypeTreeRanking  r = logNumberRankingsRec(n, tree);
-    return r.rank-2*gsl_sf_lnfact(r.leaf-1)-log(r.leaf);
+    return r.rank-2*lgammafn(r.leaf-2)-log(r.leaf);
 }
 
 TypeTreeRanking logNumberRankingsRec(int n, TypeTree *tree) {
@@ -61,12 +60,12 @@ TypeTreeRanking logNumberRankingsRec(int n, TypeTree *tree) {
     }
     rl = logNumberRankingsRec(tree->node[n].child, tree);
     if(tree->node[tree->node[n].child].sibling == NOSUCH) {
-        fprintf(stderr, "Warning: node with a single child\n");
+        warning("Warning: node with a single child\n");
         return rl;
     }
     rr = logNumberRankingsRec(tree->node[tree->node[n].child].sibling, tree);
     if(tree->node[tree->node[tree->node[n].child].sibling].sibling != NOSUCH)
-        fprintf(stderr, "Warning: we don't deal with polytomies\n");
+        warning("Warning: we don't deal with polytomies\n");
     res.leaf = rl.leaf+rr.leaf;
     res.rank = rl.rank+rr.rank+log(2)+logBinomial((unsigned int) (rl.leaf-1), (unsigned int) (res.leaf-2));
     return res;
@@ -87,12 +86,12 @@ TypeTreeRanking logNumberOrdersRec(int n, TypeTree *tree) {
     }
     rl = logNumberOrdersRec(tree->node[n].child, tree);
     if(tree->node[tree->node[n].child].sibling == NOSUCH) {
-        fprintf(stderr, "Warning: node with a single child\n");
+        warning("Warning: node with a single child\n");
         return rl;
     }
     rr = logNumberOrdersRec(tree->node[tree->node[n].child].sibling, tree);
     if(tree->node[tree->node[tree->node[n].child].sibling].sibling != NOSUCH)
-        fprintf(stderr, "Warning: we don't deal with polytomies\n");
+        warning("Warning: we don't deal with polytomies\n");
     res.leaf = rl.leaf+rr.leaf;
     res.rank = rl.rank+rr.rank+logBinomial((unsigned int) (rl.leaf-1), (unsigned int) (res.leaf-2));
     return res;
@@ -116,7 +115,7 @@ double logNumberTrees(int n) {
     if(n < 2)
         return 0.;
     else
-        return gsl_sf_lnfact(2*n-3)-gsl_sf_lnfact(n-2)-log(2.0)*((double) n-2.);
+        return lgammafn(2*n-4)-lgammafn(n-3)-log(2.0)*((double) n-2.);
 }
 
 
@@ -156,13 +155,6 @@ TypeEmpiricalDistributionItem **rankingNumberDistribution(int n) {
                     ind++;
                  }
          }
-
-double suma=0., sumb=0.;
-for(j=0; j<ind; j++) {
-	suma+=emp[i][j].eff;
-	sumb+=emp[i][j].eff*exp(emp[i][j].val);
-}
-printf("i %d tot eff %.2lE/%.2lE %.2lE/%.2lE\n", i, suma, numberTrees(i), sumb, exp(2*gsl_sf_lnfact(i-1)+log(i)));
         size = ind;
         qsort(emp[i], size, sizeof(TypeEmpiricalDistributionItem),compareEmpiricalItem);
        ind=0;
@@ -224,21 +216,16 @@ void toDistribution(TypeEmpiricalDistributionItem **emp, int n) {
     int i;
     for(i=0; i<n; i++) {
         int j;
-/*        double sum = 0;
-        for(j=0; !isnan(emp[i][j].val); j++)
-            sum += emp[i][j].eff;
-*/
+
       double sum = 0;
         for(j=0; !isnan(emp[i][j].val); j++)
             sum += emp[i][j].eff*emp[i][j].val;
-       printf("i %d sum : %.2lE/%.2lE\n", i , sum, exp(2*gsl_sf_lnfact(i)+log(i+1)));
-        for(j=0; !isnan(emp[i][j].val); j++) {
-            emp[i][j].val = exp((emp[i][j].val)-2*gsl_sf_lnfact(i)-log((double)i+1.)+logNumberTrees(i+1));
+         for(j=0; !isnan(emp[i][j].val); j++) {
+            emp[i][j].val = exp((emp[i][j].val)-2*lgammafn(i-1)-log((double)i+1.)+logNumberTrees(i+1));
             emp[i][j].eff /= numberTrees(i+1);
         }
         sum = 0;
         for(j=0; !isnan(emp[i][j].val); j++)
             sum += emp[i][j].eff*emp[i][j].val;
-       printf("i %d sum : %lE\n", i , sum);
    }
 }

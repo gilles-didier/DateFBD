@@ -110,6 +110,13 @@ void drawLineTikz(double x0, double y0, double x1, double y1, TypeParamDrawTreeG
 //    fprintf((FILE*)param->info, "\\psline[line width=1pt,draw=%s](%.2lf, %.2lf)(%.2lf, %.2lf)\n", sprintRGBTikz(buffer, param->curgb), x0, param->height-y0, x1, param->height-y1);
 }
 
+void drawLineColorAlphaTikz(TypeRGB rgb, double alpha, double x0, double y0, double x1, double y1, TypeParamDrawTreeGeneric *param) {
+	char buffer[MAX_STRING_SIZE];
+    fprintf((FILE*)param->info, "%s\n\\draw[line width=1pt,opacity=%.2lf,draw=color] (%.2lf, %.2lf) -- (%.2lf, %.2lf);\n", sprintRGBTikz(buffer, rgb), alpha, x0, param->height-y0, x1, param->height-y1);
+//    fprintf((FILE*)param->info, "\\psline[line width=1pt,draw=%s](%.2lf, %.2lf)(%.2lf, %.2lf)\n", sprintRGBTikz(buffer, param->curgb), x0, param->height-y0, x1, param->height-y1);
+}
+
+
 void drawLineDotTikz(TypeRGB rgb, double alpha, double radius, double x0, double y0, double x1, double y1, TypeParamDrawTreeGeneric *param) {
 	char buffer[MAX_STRING_SIZE];
     fprintf((FILE*)param->info, "%s\n\\draw[line width=%.2lf,opacity=%.2lf,draw=color,line cap=round] (%.2lf, %.2lf) -- (%.2lf, %.2lf);\n", sprintRGBTikz(buffer, rgb), radius, alpha, x0, param->height-y0, x1, param->height-y1);
@@ -166,6 +173,7 @@ void setFunctTikz(TypeFunctDrawTreeGeneric *funct) {
 	funct->end = endTikz;
 	funct->drawText = drawTextTikz;
 	funct->drawLine = drawLineTikz;
+	funct->drawLineColorAlpha = drawLineColorAlphaTikz;
 }
 
 void startTikzStd(char *filename, double width, double height, TypeParamDrawTreeGeneric *param) {
@@ -186,7 +194,9 @@ void startTikzStd(char *filename, double width, double height, TypeParamDrawTree
 	param->leafCur = 0.;
 	param->info = (void*) fo;
 	param->height = height;
-	param->width = height*0.75;
+//	param->height = param->leafSep*(countLeaves(tree)+1)+3*OFFSET+3*LABEL_SEP+FONT_SIZE;
+//	param->width = height*0.75;
+	param->width = width;
 	param->tickLength = 0.02;
     param->scale = (param->width-(param->xoffset+param->labelSep+param->labelWidth))/((param->tmax-param->tmin));
     param->curgb = (TypeRGB) {.red = 0., .green = 0., .blue = 0.};
@@ -195,10 +205,12 @@ void startTikzStd(char *filename, double width, double height, TypeParamDrawTree
 
 void startTikz(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) {
 	FILE *fo;
+printf("okAAA\n");
 	if(!(fo = fopen(filename, "w"))) {
 		fprintf(stderr, "Error while opening %s\n", filename);
 		exit(1);
 	}
+printf("okAAA\n");
 	param->scale = 10.;
 	param->xoffset = 0.1;
 	param->yoffset = 0;
@@ -210,10 +222,12 @@ void startTikz(char *filename, TypeTree *tree, TypeParamDrawTreeGeneric *param) 
 	param->roffset = 0.05;
 	param->leafCur = 0.;
     param->tmin = tree->minTime;
-    param->tmax = tree->maxTime;
+//    param->tmax = tree->maxTime;
 	param->info = (void*) fo;
-	param->height = param->leafSep*(countLeaves(tree)+1)+3*OFFSET+3*LABEL_SEP+FONT_SIZE;
-	param->width = param->height*param->ratio;
+printf("OFFSET %.2lf LABEL_SEP %.2lf FONT %.2lf\n", OFFSET, LABEL_SEP, FONT_SIZE);
+	param->height = param->leafSep*(param->nleaves+1)+3*OFFSET+3*LABEL_SEP;
+//	param->width = param->height*param->ratio;
+printf("leaves %d %.2lf height %.2lf\twidth %.2lf\n", countLeaves(tree)+1, param->leafSep, param->height, param->width);
 	param->tickLength = 0.07;
 	param->labelWidth = getMaxLeafLabelWidthTikz(tree)*CHAR_WIDTH;
 	if(param->tmin == param->tmax)

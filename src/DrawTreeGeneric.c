@@ -19,13 +19,14 @@
 #define CHAR_WIDTH 10
 
 static double drawNodeGeneric(int n, int parent, TypeTree *tree,  TypeInfoDrawTreeGeneric *param, TypeAdditionalDrawTreeGeneric *add, double *ytab);
-static void drawTreeGeneric(TypeTree *tree, TypeInfoDrawTreeGeneric *param, TypeAdditionalDrawTreeGeneric *add);
+static void drawTreeGeneric(TypeTree *tree, TypeInfoDrawTreeGeneric *param, TypeAdditionalDrawTreeGeneric *add, TypeAdditionalDrawTreeGenericGeneral *addG);
 
 
 void drawScaleGeneric(double x, double y, TypeInfoDrawTreeGeneric *info) {
 	int flag = 0;
 	double start, end, step, cur, width;
 	width = info->param.width-info->param.labelWidth-info->param.xoffset-info->param.labelSep;
+printf("line %.2lf %.2lf %.2lf\n", y, x, x+width);
 	info->funct.drawLine(x, y, x+width, y, &(info->param));
 	if((info->param.tmax-info->param.tmin) <= 0.)
 		return;
@@ -36,7 +37,7 @@ void drawScaleGeneric(double x, double y, TypeInfoDrawTreeGeneric *info) {
 	flag = step<1.;
 	start = step*ceil(info->param.tmin/step);
 	end = step*floor(info->param.tmax/step);
-printf("step %.1lf\n", step);
+//printf("step %.1lf, max %.1lf\n", step, info->param.tmax);
 	for(cur=start; cur<=end; cur += step) {
 		char tmp[500];
 		info->funct.drawLine(x+(cur-info->param.tmin)*info->param.scale, y, x+(cur-info->param.tmin)*info->param.scale, y+info->param.tickLength, &(info->param));
@@ -48,7 +49,7 @@ printf("step %.1lf\n", step);
 	}
 }
 
-void drawTreeFileGeneric(char *filename, TypeTree *tree, TypeInfoDrawTreeGeneric *info, TypeAdditionalDrawTreeGeneric *add) {
+void drawTreeFileGeneric(char *filename, TypeTree *tree, TypeInfoDrawTreeGeneric *info, TypeAdditionalDrawTreeGeneric *add, TypeAdditionalDrawTreeGenericGeneral *addG) {
 	int i;
 	double *timeSave;
 	
@@ -68,9 +69,18 @@ void drawTreeFileGeneric(char *filename, TypeTree *tree, TypeInfoDrawTreeGeneric
 			tree->time[i] = 1.;
 		bltoabsTime(tree);
 	}
+//	info->param.nleaves = countLeaves(tree);
+	info->param.nleaves = tree->size/2+1;
+printf("ok %s\n", filename);
 	info->funct.start(filename, tree, &(info->param));
-	drawTreeGeneric(tree, info, add);
-	drawScaleGeneric(info->param.xoffset, info->param.leafSep*(countLeaves(tree)+1)+info->param.labelSep, info);
+printf("tree->height %.2lf\n", info->param.height);
+printf("tree scale %.2lf\n", info->param.leafSep*(countLeaves(tree)+1)+info->param.labelSep);
+printf(" %d\n", tree->size);
+printf("ok\n");
+	drawTreeGeneric(tree, info, add, addG);
+printf("ok\n");
+	drawScaleGeneric(info->param.xoffset, info->param.leafSep*(info->param.nleaves+1)+info->param.labelSep, info);
+printf("ok\n");
 	info->funct.end(&(info->param));
 	free((void*) tree->time);
 	tree->time = timeSave;
@@ -109,7 +119,7 @@ void drawTreeFileGenericDebug(char *filename, TypeTree *tree, TypeInfoDrawTreeGe
 		strcpy(tree->name[i], buffer);
 	}
 	info->funct.start(filename, tree, &(info->param));
-	drawTreeGeneric(tree, info, add);
+	drawTreeGeneric(tree, info, add, NULL);
 	drawScaleGeneric(info->param.xoffset, info->param.leafSep*(countLeaves(tree)+1)+info->param.labelSep, info);
 	info->funct.end(&(info->param));
 	for(i=0; i<tree->size; i++)
@@ -121,7 +131,7 @@ void drawTreeFileGenericDebug(char *filename, TypeTree *tree, TypeInfoDrawTreeGe
 	tree->time = timeSave;
 }
 
-void drawTreeGeneric(TypeTree *tree, TypeInfoDrawTreeGeneric *info, TypeAdditionalDrawTreeGeneric *add) {
+void drawTreeGeneric(TypeTree *tree, TypeInfoDrawTreeGeneric *info, TypeAdditionalDrawTreeGeneric *add, TypeAdditionalDrawTreeGenericGeneral *addG) {
 	int tmp, n;
 	double min, max, *ytab;
 	if(tree->size<=0)
@@ -144,6 +154,8 @@ void drawTreeGeneric(TypeTree *tree, TypeInfoDrawTreeGeneric *info, TypeAddition
 	if(add != NULL)
 		for(n=0; n<tree->size; n++)
 			add->draw(n, (tree->time[n]-info->param.tmin)*info->param.scale+info->param.xoffset, ytab[n], info, add->data);
+	if(addG != NULL)
+		addG->draw(info, addG->data);
 	free((void*)ytab);
 }
 

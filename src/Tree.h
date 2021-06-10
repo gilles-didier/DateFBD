@@ -19,6 +19,16 @@
 #define NO_TIME -DBL_MAX
 #define CO_TIME DBL_MAX
 
+typedef enum DISPLAY_NAME {
+	display_none=0,
+	display_name,
+	display_index,
+	display_both,
+	display_time_none,
+	display_time_name,
+	display_time_index,
+	display_time_both
+} TypeDisplayName;
 
 typedef struct TIME_INTERVAL {
     double inf, sup;
@@ -76,7 +86,8 @@ typedef struct TREE {
 extern "C" {
 namespace Tree {
 #endif
-double getMinTimeFromNode(int n, TypeTree *tree);
+/*print tree in newick format*/
+void sprintTreeNewick(char *f, TypeTree *tree);double getMinTimeFromNode(int n, TypeTree *tree);
 int getClade(char **listClad, TypeTree *tree);
 int getNodeFromName(char *name, TypeTree *tree);
 void fprintLeavesFromNode(FILE *f, int n, TypeTree *tree);
@@ -206,7 +217,8 @@ TypeTree **readTrees(FILE *f);
 void reorderTreeSize(TypeTree *tree);
 void reindexTree(TypeTree *tree, int *index);
 void fillIndexTree(int n, int *cur, TypeTree *tree, int *index);
-
+/*make the set of trees 'tree' such that each node name has the same index in each of the tree, the nodes with names have the first indexes */
+void fixTreeSet(TypeTree **tree);
 #ifdef __cplusplus
 }
 }

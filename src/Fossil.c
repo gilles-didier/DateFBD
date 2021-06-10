@@ -2,6 +2,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+
 #include "Utils.h"
 #include "Fossil.h"
 
@@ -15,8 +16,7 @@ int checkConsistency(TypeFossilFeature *fp, int size) {
 			double last = fp->fossilList[fp->fossil[i]].time;
 			for(k=fp->fossilList[fp->fossil[i]].prec; k!=NOSUCH; k=fp->fossilList[k].prec) {
 				if(last < fp->fossilList[k].time) {
-					printf("problem %.2lf %.2lf\n", last, fp->fossilList[k].time);
-					return 0;
+					error("problem %.2lf %.2lf\n", last, fp->fossilList[k].time);
 				}
 				last = fp->fossilList[k].time;
 			}
@@ -67,6 +67,25 @@ double getMaxFossilTime(TypeFossilFeature* feat) {
 	return max;
 }
 
+double getMaxFossilTimeToNode(int n, TypeTree *tree, TypeFossilFeature* feat) {
+	double max = tree->minTimeInt.sup;
+	if(tree->parent == NULL)
+		tree->parent = getParent(tree);
+	if(feat->fossil[n] != NOSUCH) {
+		int f;
+		max = feat->fossilList[feat->fossil[n]].time;
+		for(f=feat->fossilList[feat->fossil[n]].prec; f!=NOSUCH; f=feat->fossilList[f].prec)
+			if(feat->fossilList[f].time>max)
+				max = feat->fossilList[f].time;
+	} else {
+		if(tree->parent[n] != NOSUCH)
+			max = getMaxFossilTimeToNode(tree->parent[n], tree, feat);
+		else
+			max = tree->minTime;
+	}
+	return max;
+}
+
 int compareFossilList(const void* a, const void* b) {
 	if(((TypeFossilList*)a)->time>((TypeFossilList*)b)->time)
 		return 1;
@@ -85,6 +104,7 @@ void freeFossilFeature(TypeFossilFeature *fos) {
 	if(fos->fossilList != NULL)
 		free((void*)fos->fossilList);
 	free((void*)fos);
+
 }
 
 /*print fossilInt*/	
@@ -100,20 +120,7 @@ void fprintFossilFeature(FILE *f, TypeFossilFeature *feat, char **name, int size
 		}
 	}
 }
-///*print fossilInt*/	
-//void fprintFossilFeature(FILE *f, TypeFossilFeature *feat, char **name, int size) {
-	//int i;
-	//for(i=0; i<size; i++) {
-		//if(feat->fossil[i]!=NOSUCH) {
-			//if(name != NULL && name[i] != NULL)
-				//fprintf(f, "%s (%d)", name[i], i);
-			//else
-				//fprintf(f, "--- (%d)", i);
-			//fprintFossilList(f, feat->fossil[i], feat->fossilList);
-			//fprintf(f, "\n");
-		//}
-	//}
-//}
+
 
 void fixTreeFossil(TypeTree *tree, TypeFossilFeature *fos) {
 	int n;
@@ -197,7 +204,7 @@ TypeInterval readInterval(char *s) {
 		fossil.inf =	atof(tmp);
 		for(; s[i] != '\0' && issep(s[i]); i++);
 		if(s[i] != ':')
-			exitProg(ErrorReading, "Missing ':' while reading a fossil time interval.");
+			error("Missing ':' while reading a fossil time interval.");
 		i++;
 		for(; s[i] != '\0' && issep(s[i]); i++);
 		ind = 0;
@@ -207,7 +214,7 @@ TypeInterval readInterval(char *s) {
 		fossil.sup =	atof(tmp);
 		for(; s[i] != '\0' && issep(s[i]); i++);
 		if(s[i] != ')')
-			exitProg(ErrorReading, "Missing ')' while reading a fossil time interval.");
+			error("Missing ')' while reading a fossil time interval.");
 	} else {
 		fossil.inf = atof(s);		
 		fossil.sup = fossil.inf;
@@ -527,6 +534,127 @@ TypeTree *pruneFossilBis(TypeTree *tree,  TypeFossilFeature *fos) {
 	return resT;
 }
 
+/*fill the table maxTime where entry n the most recent time of the clade n*/
+void fillMaxTime(int n, TypeTree *tree, double *maxTime) {
+	if(tree->node[n].child == NOSUCH)
+		maxTime[n] = tree->time[n];
+	else {
+		int c;
+		for(c=tree->node[n].child; c!=NOSUCH; c=tree->node[c].sibling)
+			fillMaxTime(c, tree, maxTime);
+		maxTime[n] = maxTime[tree->node[n].child];
+		for(c=tree->node[tree->node[n].child].sibling; c!=NOSUCH; c=tree->node[c].sibling)
+			if(maxTime[c] > maxTime[n])
+				maxTime[n] = maxTime[c];
+	}
+}	
+
+/*prune "tree" to that can be observed from contemporary lineages and fossil finds*/
+TypeTree *pruneFossilTer(TypeTree *tree,  TypeFossilFeature *fos) {
+	TypeTree *resT;
+	TypeFossilFeatureMaxTime *resFMT;
+	TypeFossilFeature *resF;
+	int n, f, *parent, *index;
+	double *maxTime, *resMT;
+	if(tree->time == NULL)
+		return NULL;
+	resT = newTree(tree->size);
+	resT->maxTime = tree->maxTime;
+	resT->minTime = tree->minTime;
+	maxTime = (double*) malloc(tree->size*sizeof(double));
+	fillMaxTime(tree->root, tree, maxTime);
+	resMT = (double*) malloc(tree->size*sizeof(double));
+	if(fos)
+		resF = (TypeFossilFeature*) malloc(sizeof(TypeFossilFeature));
+	else
+		resF = NULL;
+	resFMT = (TypeFossilFeatureMaxTime*) malloc(sizeof(TypeFossilFeatureMaxTime));
+	resFMT->fos = resF;
+ 	resFMT->maxTime = resMT;
+    resT->info = (void*) resFMT;
+	if(tree->size == 0) {
+		resT->size = 0;
+		resT->sizeBuf = 0;
+		free((void*)resT->node);
+		resT->node = NULL;
+		free((void*)resT->time);
+		resT->time = NULL;
+		if(resF) {
+			resF->size = 0;
+			resF->sizeBuf = 0;
+			resF->fossilList = NULL;
+			resF->fossil = NULL;
+		}
+		return resT;
+	}
+	resT->size = 0;
+	if(fos) {
+		resF->fossil = (int*) malloc(tree->size*sizeof(int));
+		resF->status = NULL;
+		resF->size = fos->size;
+		resF->sizeBuf = fos->size;
+        resF->fossilList = (TypeFossilList*) malloc(fos->size*sizeof(TypeFossilList));
+		for(f=0; f<fos->size; f++)
+			resF->fossilList[f] = fos->fossilList[f];
+	}
+	index = (int*) malloc(tree->size*sizeof(int));
+	for(n=0; n<tree->size; n++)
+		index[n] = NOSUCH;
+	parent = getParent(tree);
+	for(n=0; n<tree->size; n++)
+		if(index[n] == NOSUCH && (tree->time[n]>=tree->maxTime || (fos && fos->fossil[n]>=0))) {
+			int m;
+			index[n] = resT->size++;
+			for(m=parent[n]; m != NOSUCH && index[m] == NOSUCH; m=parent[m])
+				index[m] = resT->size++;
+		}
+	for(n=0; n<tree->size; n++) {
+		if(index[n] != NOSUCH) {
+			int *prec, c;
+			resT->time[index[n]] = tree->time[n];
+            if(tree->name)
+                resT->name[index[n]] = strdpl(tree->name[n]);
+            if(tree->comment)
+                resT->comment[index[n]] = strdpl(tree->comment[n]);
+			if(fos)
+				resF->fossil[index[n]] = fos->fossil[n];
+			prec = &(resT->node[index[n]].child);
+			for(c=tree->node[n].child; c!=NOSUCH; c=tree->node[c].sibling)
+				if(index[c] != NOSUCH) {
+					*prec = index[c];
+					prec =  &(resT->node[index[c]].sibling);
+				}
+			*prec = NOSUCH;
+			if(resT->node[index[n]].child == NOSUCH) {
+				if(tree->time[n]>=tree->maxTime) {
+					resT->time[index[n]] = tree->time[n];
+					resMT[index[n]] = MY_NAN;
+				} else {
+					resT->time[index[n]] = fos->fossilList[fos->fossil[n]].time;
+					resMT[index[n]] = maxTime[n];
+				}
+			}	
+		}
+	}
+	free((void*)maxTime);
+	resT->node = (TypeNode*) realloc(resT->node, resT->size*sizeof(TypeNode));
+	if(resT->time)
+		resT->time = (double*) realloc(resT->time, resT->size*sizeof(double));
+	if(tree->name)
+		resT->name = (char**) realloc(resT->name, resT->size*sizeof(char*));
+	if(tree->comment)
+		resT->comment = (char**) realloc(resT->comment, resT->size*sizeof(char*));
+	if(resF)
+		resF->fossil = (int*) realloc(resF->fossil, resT->size*sizeof(int));
+	if(resFMT->maxTime)
+		resFMT->maxTime = (double*) realloc(resFMT->maxTime, resT->size*sizeof(double));
+	free((void*)parent);
+	parent = getParent(resT);
+	for(n=0; n<resT->size && parent[n]>=0; n++);
+	free((void*)parent);
+	resT->root = n;
+	return resT;
+}
 
 
 int iterateBinaryFossil(int n, TypeTree *resT,  TypeFossilFeature *resF, TypeTree *tree,  TypeFossilFeature *fos) {
@@ -551,7 +679,7 @@ int iterateBinaryFossil(int n, TypeTree *resT,  TypeFossilFeature *resF, TypeTre
 		int c1, c2, c;
         c1 = iterateBinaryFossil(tree->node[m].child, resT, resF, tree, fos);
 		c2 = c1;
-		for(c=tree->node[tree->node[m].child].sibling; c >= 0; c = tree->node[c].sibling) {
+		for(c=tree->node[tree->node[m].child].sibling; c!=NOSUCH; c = tree->node[c].sibling) {
             resT->node[c2].sibling = iterateBinaryFossil(c, resT, resF, tree, fos);
 			c2 = resT->node[c2].sibling;
 		}
@@ -640,6 +768,109 @@ TypeTree *fixBinaryFossil(TypeTree *tree,  TypeFossilFeature *fos) {
 	return resT;
 }
 
+int iterateBinaryFossilBis(int n, TypeTree *resT,  TypeFossilFeature *resF, double *resMT, TypeTree *tree,  TypeFossilFeature *fos, double *maxTime) {
+    int m, ftmp = NOSUCH;
+	if(n == NOSUCH)
+		return NOSUCH;
+	for(m=n; tree->node[m].child!=NOSUCH && tree->node[tree->node[m].child].sibling==NOSUCH; m=tree->node[m].child) {
+		if(fos && fos->fossil[m]!=NOSUCH) {
+			int f;
+			for(f=fos->fossil[m]; resF->fossilList[f].prec>=0; f=resF->fossilList[f].prec);
+			resF->fossilList[f].prec = ftmp;
+			ftmp = fos->fossil[m];
+		}
+	}
+	if(fos && fos->fossil[m]!=NOSUCH) {
+		int f;
+		for(f=fos->fossil[m]; resF->fossilList[f].prec>=0; f=resF->fossilList[f].prec);
+		resF->fossilList[f].prec = ftmp;
+		ftmp = fos->fossil[m];
+	}
+	if(tree->node[m].child!=NOSUCH) {
+		int c1, c2, c;
+        c1 = iterateBinaryFossilBis(tree->node[m].child, resT, resF, resMT, tree, fos, maxTime);
+		c2 = c1;
+		for(c=tree->node[tree->node[m].child].sibling; c >= 0; c = tree->node[c].sibling) {
+            resT->node[c2].sibling = iterateBinaryFossilBis(c, resT, resF, resMT, tree, fos, maxTime);
+			c2 = resT->node[c2].sibling;
+		}
+        resT->node[c2].sibling = NOSUCH;
+		resT->node[resT->size].child = c1;
+	} else {
+        resT->node[resT->size].child = NOSUCH;
+        resMT[resT->size] = maxTime[m];
+	}
+	if(fos)
+		resF->fossil[resT->size] = ftmp;
+	if(tree->time)
+		resT->time[resT->size] = tree->time[m];
+	if(tree->name)
+		resT->name[resT->size] = strdpl(tree->name[m]);
+	if(tree->comment)
+		resT->comment[resT->size] = strdpl(tree->comment[m]);
+	resT->size++;
+	return resT->size-1;
+}
+
+TypeTree *fixBinaryFossilBis(TypeTree *tree,  TypeFossilFeature *fos, double *maxTime) {
+	TypeTree *resT;
+	TypeFossilFeature *resF;
+	TypeFossilFeatureMaxTime *resFMT;
+	double *resMT;
+    int f;
+	if(tree->size == 0)
+		return NULL;
+	resT = (TypeTree*) malloc(sizeof(TypeTree));
+	if(fos)
+		resF = (TypeFossilFeature*) malloc(sizeof(TypeFossilFeature));
+	else
+		resF = NULL;
+	resMT = (double*) malloc(tree->size*sizeof(double));
+	resFMT = (TypeFossilFeatureMaxTime*) malloc(sizeof(TypeFossilFeatureMaxTime));
+	resFMT->fos = resF;
+	resFMT->maxTime = resMT;
+    resT->info = (void*) resFMT;
+	resT->maxTime = tree->maxTime;
+	resT->maxTimeInt = tree->maxTimeInt;
+	resT->minTime = tree->minTime;
+	resT->minTimeInt = tree->minTimeInt;
+	resT->size = 0;
+	resT->sizeBuf = tree->size;
+	resT->node = (TypeNode*) malloc(tree->size*sizeof(TypeNode));
+	resT->time = (double*) malloc(tree->size*sizeof(double));
+    resT->parent = NULL;
+	if(tree->name)
+		resT->name = (char**) malloc(tree->size*sizeof(char*));
+	else
+		resT->name = NULL;
+	if(tree->comment)
+		resT->comment = (char**) malloc(tree->size*sizeof(char*));
+	else
+		resT->comment = NULL;
+	if(fos) {
+		resF->fossil = (int*) malloc(tree->size*sizeof(int));
+		resF->size = fos->size;
+		resF->status = NULL;
+		resF->sizeBuf = fos->size;
+        resF->fossilList = (TypeFossilList*) malloc(fos->size*sizeof(TypeFossilList));
+		for(f=0; f<fos->size; f++)
+			resF->fossilList[f] = fos->fossilList[f];
+	}
+    iterateBinaryFossilBis(tree->root, resT, resF, resMT, tree, fos, maxTime);
+	resT->node = (TypeNode*) realloc(resT->node, resT->size*sizeof(TypeNode));
+	if(resT->time)
+		resT->time = (double*) realloc(resT->time, resT->size*sizeof(double));
+	if(tree->name)
+		resT->name = (char**) realloc(resT->name, resT->size*sizeof(char*));
+	if(tree->comment)
+		resT->comment = (char**) realloc(resT->comment, resT->size*sizeof(char*));
+	if(resF)
+		resF->fossil = (int*) realloc(resF->fossil, resT->size*sizeof(int));		
+	if(resFMT->maxTime)
+		resFMT->maxTime = (double*) realloc(resFMT->maxTime, resT->size*sizeof(double));
+	resT->root = getRoot(resT);
+	return resT;
+}
 
 
 /*print fossilInt table*/

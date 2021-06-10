@@ -2,10 +2,8 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#include "Utils.h"
-#include "MyError.h"
-//#include "Random.h"
 
+#include "Utils.h"
 #include "FossilInt.h"
 
 #define INC_FOSSIL_ITEM 50
@@ -256,6 +254,18 @@ double getMaxFossilIntTime(TypeFossilIntFeature* feat) {
     return max;
 }
 
+double getFossilIntMaxInfTime(TypeFossilIntFeature* feat) {
+    int i;
+    double max;
+    if(feat == NULL || feat->sizeFossil == 0)
+        return 0.;
+    max = feat->fossilIntList[0].fossilInt.inf;
+    for(i=1; i<feat->sizeFossil; i++)
+        if(feat->fossilIntList[i].fossilInt.inf>max)
+            max = feat->fossilIntList[i].fossilInt.inf;
+    return max;
+}
+
 void negateFossilInt(TypeFossilIntFeature* feat) {
     int i;
     for(i=0; i<feat->sizeFossil; i++) {
@@ -291,9 +301,7 @@ TypeFossilFeature *sampleFossilInt(TypeFossilIntFeature* feat, int size) {
         sample->fossil[i] = feat->fossilInt[i];
     for(i=0; i<sample->size; i++) {
         sample->fossilList[i].prec = feat->fossilIntList[i].prec;
-//		sample->fossilList[i].time = feat->fossilIntList[i].fossilInt.inf+getUniformCont(feat->fossilIntList[i].fossilInt.sup-feat->fossilIntList[i].fossilInt.inf);
         sample->fossilList[i].time = feat->fossilIntList[i].fossilInt.inf+UNIF_RAND*(feat->fossilIntList[i].fossilInt.sup-feat->fossilIntList[i].fossilInt.inf);
-//printf("fossil %d t %.2lf [%.2lf, %.2lf]\n", i, sample->fossilList[i].time, feat->fossilIntList[i].fossilInt.inf, feat->fossilIntList[i].fossilInt.sup);
     }
     index = qsortindex(sample->fossilList, sample->size, sizeof(TypeFossilList), compareFossilList);
     for(n=0; n<size; n++)
@@ -396,7 +404,7 @@ TypeTimeInterval toFossilInt(char *s) {
         fossilInt.inf =	atof(tmp);
         for(; s[i] != '\0' && isspace(s[i]); i++);
         if(s[i] != ':' && s[i] != ';')
-            exitProg(ErrorReading, "Missing ':' or ';' while reading a fossilInt time interval.");
+            error("Missing ':' or ';' while reading a fossilInt time interval.");
         i++;
         for(; s[i] != '\0' && isspace(s[i]); i++);
         ind = 0;
@@ -406,7 +414,7 @@ TypeTimeInterval toFossilInt(char *s) {
         fossilInt.sup =	atof(tmp);
         for(; s[i] != '\0' && isspace(s[i]); i++);
         if(s[i] != ')' && s[i] != ']')
-            exitProg(ErrorReading, "Missing ')' or ']' while reading a fossilInt time interval.");
+            error("Missing ')' or ']' while reading a fossilInt time interval.");
         if(fossilInt.sup<fossilInt.inf) {
             double tmp = fossilInt.sup;
             fossilInt.sup = fossilInt.inf;
@@ -506,8 +514,7 @@ TypeFossilIntFeature *fosToFossilInt(TypeTree *tree) {
                 while(s!=NULL && s[0]!='\0') {
                     char *tag, *val;
                     s = nextTag(s, &tag, &val);
- //fprintf(stderr, "node %d tag %s\t val %s\n", n, tag, val);
-                   if(tag != NULL && strcmp(tag, "FOS")==0 && val != NULL) {
+                    if(tag != NULL && strcmp(tag, "FOS")==0 && val != NULL) {
                         if(fos->sizeFossil>=fos->sizeBufFossil) {
                             fos->sizeBufFossil += INC_FOSSIL_ITEM;
                             fos->fossilIntList = (TypeFossilIntList*) realloc((void*) fos->fossilIntList, fos->sizeBufFossil*sizeof(TypeFossilIntList));
@@ -537,14 +544,7 @@ TypeFossilIntFeature *fosToFossilInt(TypeTree *tree) {
                 }
                if(fos->status[n] == unknownNodeStatus) {
                     if(!isnan(ti.inf)) {
-                        //if(fos->sizeTime>=fos->sizeBufTime) {
-                            //fos->sizeBufTime += INC_BUF_TIME_TABLE;
-                            //fos->endTimeTable = (TypeTimeInterval*) realloc ((void*)fos->endTimeTable,fos->sizeBufTime*sizeof(TypeTimeInterval));
-                        //}
-                        //fos->endTimeTable[fos->sizeTime] = ti;
-                        //fos->endTime[n] = fos->sizeTime++;
-                        tree->time[n] = ti.inf;
- //printf("FF node %d %s %.2lf (st %d)\n", n, tree->name[n], ti.inf, fos->status[n]);
+                         tree->time[n] = ti.inf;
                    } else {
                         if(tree->node[n].child == NOSUCH)
                             fos->status[n] = contempNodeStatus;
@@ -562,7 +562,6 @@ TypeFossilIntFeature *fosToFossilInt(TypeTree *tree) {
             while(s!=NULL && s[0]!='\0') {
                 char *tag, *val;
                 s = nextTag(s, &tag, &val);
-//        fprintf(stderr, "tag %s\t val %s\n", tag, val);
                 if(tag != NULL && strcmp(tag, TAG_FOSSIL)==0 && val != NULL) {
                     if(fos->sizeFossil>=fos->sizeBufFossil) {
                         fos->sizeBufFossil += INC_FOSSIL_ITEM;
@@ -681,11 +680,6 @@ TypeNameFossilIntTab *readFossilIntTab(FILE *f) {
 				} else {
 					res->fossilIntTab[res->size].fossilInt[res->fossilIntTab[res->size].size++] = toFossilInt(bof);
 				}
-DEBUG(
-    printf("\"%s\"\t%s\t", tmp, bof);
-    fprintFossilInt(stdout, res->fossilIntTab[res->size].fossilInt[res->fossilIntTab[res->size].size-1]);
-    printf("\n");
-)
                for(; c != EOF && issep(c); c = fgetc(f));
             }
             res->size++;
@@ -816,7 +810,7 @@ void reindexFossilInt(TypeFossilIntFeature *fos, int *index) {
             }
         } else {
             if(fos->status[n] == unknownNodeStatus)
-                printf("unknown %d\n", n);
+                warning("Warnin FoffilInt : unknown %d\n", n);
             fos->status[index[n]] = fos->status[n];
             fos->fossilInt[index[n]] = fos->fossilInt[n];
             fos->endTime[index[n]] = fos->endTime[n];

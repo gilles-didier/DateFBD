@@ -2,6 +2,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+
 #include "Utils.h"
 #include "Distribution.h"
 
@@ -15,16 +16,6 @@ int compareDistributionItem(const void* a, const void* b) {
     return 0;
 }
 
-//TypeDistribution meanDistribution(TypeDistribution d1, double w1, TypeDistribution d2, double w2) {
-	//TypeDistribution d;
-	//if(d1.size != d2.size) {
-		//d.size = 0;
-		//d.item = NULL;
-		//return d;
-	//}
-	//return d;
-//}
-
 double sumDistribution(TypeDistribution d) {
 	int i;
 	double sum;
@@ -36,6 +27,64 @@ double sumDistribution(TypeDistribution d) {
 	for(i=1; i<d.size-1; i++)
 		sum += ((d.item[i].val-d.item[i-1].val)/2.+(d.item[i+1].val-d.item[i].val)/2.)*d.item[i].dens;
 	sum += (d.item[d.size-1].val-d.item[d.size-2].val)*d.item[d.size-1].dens;
+	return sum;
+}
+
+double sumTrapezeDistribution(TypeDistribution d) {
+	int i;
+	double sum;
+	if(d.size == 0)
+		return 0;
+	sum = 0.;
+	for(i=1; i<d.size; i++)
+		sum += (d.item[i].val-d.item[i-1].val)*(d.item[i].dens+d.item[i-1].dens)/2.;
+	return sum;
+}
+
+double sumExpTrapezeDistribution(TypeDistribution d) {
+	int i;
+	double sum;
+	if(d.size == 0)
+		return 0;
+	sum = 0.;
+	for(i=1; i<d.size; i++)
+		sum += (d.item[i].val-d.item[i-1].val)*(exp(d.item[i].dens)+exp(d.item[i-1].dens))/2.;
+	return sum;
+}
+
+double sumSimpsonDistribution(TypeDistribution d) {
+	int i, n;
+	double sum;
+	if(d.size == 0)
+		return 0;
+	if(d.size == 1)
+		return d.item[0].dens;
+	n = d.size/2;
+	sum = d.item[0].dens;
+	for(i=1; i<n-1; i++)
+		sum += 2.*d.item[2*i].dens;
+	for(i=1; i<n; i++)
+		sum += 4.*d.item[2*i-1].dens;
+	sum += d.item[2*n].dens;
+	sum *= (d.item[1].val-d.item[0].val)/3.;
+	return sum;
+}
+
+double sumExpSimpsonDistribution(TypeDistribution d) {
+	int i, n;
+	double sum;
+	if(d.size == 0)
+		return 0;
+	if(d.size == 1)
+		return d.item[0].dens;
+	n = d.size/2;
+	sum = (d.item[0].dens>NEG_INFTY)?exp(d.item[0].dens):0.;
+	for(i=1; i<n-1; i++)
+		sum += 2.*((d.item[2*i].dens>NEG_INFTY)?exp(d.item[2*i].dens):0.);
+	for(i=1; i<n; i++)
+		sum += 4.*((d.item[2*i-1].dens>NEG_INFTY)?exp(d.item[2*i-1].dens):0.);
+	sum += (d.item[2*n].dens>NEG_INFTY)?exp(d.item[2*n].dens):0.;
+	sum *= (d.item[1].val-d.item[0].val)/3.;
 	return sum;
 }
 
@@ -132,14 +181,10 @@ TypeDistribution readDistribution(FILE *f) {
 			i++;
 		}
 		tmpA[i++] = '\0';
-		if(i == MAX_SIZE_TMP) {
-			fprintf(stderr, "Ident too long (%s) ...", tmpA);
-			exit(1);
-		}
-		if(i <= 1) {
-			fprintf(stderr, "Problem empty (%s) ...", tmpA);
-			exit(1);
-		}
+		if(i == MAX_SIZE_TMP)
+			error("Ident too long (%s) ...", tmpA);
+		if(i <= 1)
+			error("Problem empty (%s) ...", tmpA);
 		while(c!=EOF && IS_SEP(c))
 			c=getc(f);
 		i = 0;
@@ -149,14 +194,10 @@ TypeDistribution readDistribution(FILE *f) {
 			i++;
 		}
 		tmpB[i++] = '\0';
-		if(i == MAX_SIZE_TMP) {
-			fprintf(stderr, "Ident too long (%s) ...", tmpB);
-			exit(1);
-		}
-		if(i <= 1) {
-			fprintf(stderr, "Problem empty (%s) ...", tmpB);
-			exit(1);
-		}
+		if(i == MAX_SIZE_TMP)
+			error("Ident too long (%s) ...", tmpB);
+		if(i <= 1)
+			error("Problem empty (%s) ...", tmpB);
 		if(d.size >= sizeBuffer) {
 			sizeBuffer += INC_BUFFER;
 			d.item = (TypeDistributionItem*) realloc((void *) d.item, sizeBuffer*sizeof(TypeDistributionItem));
@@ -182,39 +223,6 @@ void fprintDerive(FILE *f, TypeDistribution d) {
 	for(i=0; i<d.size-1; i++)
 		fprintf(f, "%lf\t%le\n", d.item[i].val, d.item[i+1].dens- d.item[i].dens);
 }
-
-//void deriveDistribution(TypeDistribution *d) {
-	//if(d->size>0) {
-		//int i;
-		//for(i=0; i<d->size-1; i++)
-			//d->item[i].dens = d->item[i+1].dens-d->item[i].dens;
-		//d->size--;
-	//}
-//}
-
-//void deriveDistribution(TypeDistribution *d) {
-	//if(d->size>0) {
-		//int i;
-		//for(i=0; i<d->size-1; i++) {
-			//d->item[i].dens = (d->item[i+1].dens-d->item[i].dens)/(d->item[i+1].val-d->item[i].val);
-			//d->item[i].val = (d->item[i].val+d->item[i+1].val)/2.;
-		//}
-		//d->item[d->size-1].dens = 0.;
-		//d->item[d->size-1].val = d->item[d->size-1].val+(d->item[d->size-1].val-d->item[d->size-2].val)/2.;
-	//}
-//}
-
-//void deriveDistribution(TypeDistribution *d) {
-	//if(d->size>0) {
-		//int i;
-		//for(i=0; i<d->size-1; i++) {
-			//d->item[i].dens = (d->item[i+1].dens-d->item[i].dens)/(d->item[i+1].val-d->item[i].val);
-			//d->item[i].val = (d->item[i].val+d->item[i+1].val)/2.;
-		//}
-		//d->item[d->size-1].dens = 2*(1.-d->item[d->size-1].dens)/(d->item[d->size-1].val-d->item[d->size-2].val);
-		//d->item[d->size-1].val = d->item[d->size-1].val;
-	//}
-//}
 
 void deriveDistribution(TypeDistribution *d) {
 	if(d->size>0) {
@@ -304,4 +312,19 @@ double getQuantileSup(TypeDistribution d, double q) {
 	for(i=d.size-1; i>=0 && d.item[i].dens>=(1.-q); i--)
 		;
 	return d.item[i+1].val;
-}	
+}
+
+double getEmpiricalQuantile(TypeDistribution d, double q) {
+	int a, b, m;
+	if(d.size <= 1)
+		return 0;
+	a = 0; b = d.size-1;
+	while(b-a>1) {
+		m = (a+b)/2;
+		if(d.item[m].dens>q)
+			b = m;
+		else
+			a = m;
+	}
+	return d.item[b].val;
+}

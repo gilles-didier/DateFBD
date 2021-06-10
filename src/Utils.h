@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <float.h>
+#include "MyR.h"
 
 typedef /*unsigned*/ long TypePosition;
 
@@ -23,7 +24,7 @@ typedef enum TS {
     ExitOk
 } TypeExit;
 
-
+#define END_LIST_INT INT_MIN
 #define INC_SIZE_BUFFER_TABLE_DOUBLE 100
 #define INC_SIZE_DICT 100
 #define MAX_DICT_LENGTH 1000
@@ -96,9 +97,6 @@ void freeDictNode(TypeDictNode *n);
 TypeDictNode *newDictNode(char c);
 int getIndexString(char *s, TypeDictNode *cur, int *size);
 int getIndex(char *s, TypeDictNode *cur);
-void exitProg(TypeExit code, char *message);
-void *monmalloc(long size);
-void *monrealloc(void *in, long size);
 int IsSeparator(char c);
 int IsItemSeparator(char c);
 int IsLineSeparator(char c);
@@ -145,11 +143,12 @@ extern int DEBUGX;
 //#define POS_INFTY 1./0.
 #define NEG_INFTY -INFINITY
 #define POS_INFTY INFINITY
+#define MY_NAN sqrt(-1.)
 #define EPSILON 0.0000001
 //#define DEBUGX 0
 #define DEBUG(x) if(DEBUGX == 1) {x}
 /*return a random double in [0, 1]*/
-#define UNIF_RAND (((double)rand())/((double)RAND_MAX))
+#define UNIF_RAND unif_rand()
 /*return a random int in [0, k-1]*/
-#define RANGE_RAND(k) (int) floor((((double)k)*((double)rand()))/((double) RAND_MAX+1.))
+#define RANGE_RAND(k) (int) floor((((double)k)*unif_rand()))
 #endif

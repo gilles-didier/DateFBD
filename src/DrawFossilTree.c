@@ -13,6 +13,7 @@
 #include "DrawTreeGeneric.h"
 #include "DrawFossilInt.h"
 #include "DrawDensity.h"
+#include "DrawTimePosition.h"
 
 #ifdef DO_PS
 #endif
@@ -65,7 +66,7 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%c", &format) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "a character is required after option -f");
+				error("a character is required after option -f");
 		}
 		if(option['z']) {
 			option['z'] = 0;
@@ -85,8 +86,7 @@ int main(int argc, char **argv) {
 				}
 				printTreeDebug(stdout, tree->root, tree, tree->name);
 			} else {
-				fprintf(stderr, "Error while reading %s.\n", argv[i]);
-				exit(1);
+				error("Error while reading %s.\n", argv[i]);
 			}
 			exit(0);
 		}
@@ -99,14 +99,14 @@ int main(int argc, char **argv) {
 			if((i+1)<argc && sscanf(argv[i+1], "%le", &minTimeIntInf) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "1 values are expected after -o");
+				error("1 values are expected after -o");
 		}
 		if(option['e']) {
 			option['e'] = 0;
 			if((i+1)<argc && sscanf(argv[i+1], "%lf", &maxTimeIntSup) == 1)
 				i++;
 			else
-				exitProg(ErrorArgument, "1 values are expected after -o");
+				error("1 values are expected after -o");
 		}
 		if(option['h']) {
 			option['h'] = 0;
@@ -117,13 +117,12 @@ int main(int argc, char **argv) {
 	if(i<argc) {
 		inputFileNameTree = argv[i++];
 	} else {
-		fprintf(stderr, "Please provide the name of a file containing a phylogenetic tree in Newick format\n");
-		exit(1);
+		error("Please provide the name of a file containing a phylogenetic tree in Newick format\n");
 	}
 	if(i<argc) {
 		inputFileNameFossil = argv[i++];
 	} else {
-		fprintf(stderr, "Warning: No name of file containing a fossil list was provided\n");
+		error("Warning: No name of file containing a fossil list was provided\n");
 	}
 	if((fi = fopen(inputFileNameTree, "r"))) {
 		TypeTree *tree;
@@ -131,7 +130,9 @@ int main(int argc, char **argv) {
 		int n;
 		TypeInfoDrawTreeGeneric info;
 		TypeAdditionalDrawTreeGeneric add;
+		TypeAdditionalDrawTreeGenericGeneral addG;
 		TypeDataDrawFossilInt data;
+		TypeDataDrawTimePosition timePos;
 		
         tree = readTree(fi);
         fclose(fi);
@@ -142,8 +143,7 @@ int main(int argc, char **argv) {
 			if((ff = fopen(inputFileNameFossil, "r"))) {
 				fos = getFossilIntFeature(ff, tree->name, tree->size);
 			} else {
-				fprintf(stderr, "Cannot read %s\n", inputFileNameFossil);
-				exit(1);
+				error("Cannot read %s\n", inputFileNameFossil);
 			}
 		} else
 			fos = fosToFossilInt(tree);
@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
 						tree->time[n] = max;
 					break;
 					default:
-						fprintf(stderr, "Node %d has no status\n", n);
+						error("Node %d has no status\n", n);
 						return 1;
 				}
 			}
@@ -227,43 +227,49 @@ int main(int argc, char **argv) {
 		data.fos = fos;
 		add.data = &data;
 		add.draw = drawFossilInt;
+		timePos.color = (TypeRGB) {.red = 0., .green = 0., .blue = 1.};
+		timePos.alpha = 0.5;
+		timePos.pos.start = -278.;
+		timePos.pos.end = -276.;
+		addG.data = &timePos;
+		addG.draw= drawTimePosition;
 		tree->maxTime = info.param.tmax;
 		switch(format) {
 			case '1':
 				sprintf(outputFileNameG, "%s_tree.pdf", outputFileName);
 				setFunctPDF(&(info.funct));
 				data.drawLineDot = drawLineDotCairo;
-				drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+				drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 				break;
 			case '2':
 				sprintf(outputFileNameG, "%s_tree.ps", outputFileName);
 				setFunctPS(&(info.funct));
 				data.drawLineDot = drawLineDotCairo;
-				drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+				drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 				break;
 			case '3':
 				sprintf(outputFileNameG, "%s_tree.png", outputFileName);
 				setFunctPNG(&(info.funct));
 				data.drawLineDot = drawLineDotCairo;
-				drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+				drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 				break;
 			case '4':
 				sprintf(outputFileNameG, "%s_tree.svg", outputFileName);
 				setFunctSVG(&(info.funct));
 				data.drawLineDot = drawLineDotCairo;
-				drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+				drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 				break;
 			case '5':
 				sprintf(outputFileNameG, "%s_tree_pst.tex", outputFileName);
 				setFunctPSTricks(&(info.funct));
 				data.drawLineDot = drawLineDotPSTricks;
-				drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+				drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 				break;
 			case '6':
 				sprintf(outputFileNameG, "%s_tree_tikz.tex", outputFileName);
 				setFunctTikz(&(info.funct));
 				data.drawLineDot = drawLineDotTikz;
-				drawTreeFileGeneric(outputFileNameG, tree, &info, &add);
+				drawTreeFileGeneric(outputFileNameG, tree, &info, &add, &addG);
 				break;
 			default:
 				;
@@ -271,8 +277,7 @@ int main(int argc, char **argv) {
 		freeTree(tree);
 		freeFossilIntFeature(fos);
 	} else {
-		fprintf(stderr, "Cannot read %s or %s\n", inputFileNameTree, inputFileNameFossil);
-		exit(1);
+		error("Cannot read %s or %s\n", inputFileNameTree, inputFileNameFossil);
 	}
 	return 0;
 }
