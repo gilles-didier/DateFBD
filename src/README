@@ -5,11 +5,11 @@ Software includes
  - 'dspe'
 	computes the divergence time distibution associated to a given clade from a set of possible trees, the fossil stratigraphic intervals and provides coda files for MCMC convergence diagnostics
  - 'tspe'
-	computes the divergence time distribution associated to a given set of nodes of a single tree, the fossil stratigraphic intervals
+	computes the divergence time distribution associated to a given set of nodes of a single tree and the fossil stratigraphic intervals
  - 'dext'
-	computes the extinction time distibution associated to a given set of clades from a set of possible trees, the fossil stratigraphic intervals and provides coda files for MCMC convergence diagnostics
+	computes the extinction time distibutions associated to a given set of clades from a set of possible trees, the fossil stratigraphic intervals and provides coda files for MCMC convergence diagnostics
  - 'text'
-	computes the extinction time distribution associated to a given set of nodes of a single tree, the fossil stratigraphic intervals
+	computes the extinction time distribution associated to all the terminal nodes of a single tree with the fossil stratigraphic intervals
  - 'qext'
 	computes the quantile at a given order, of extinction time distibution associated to a given set of clades from a set of possible trees, the fossil stratigraphic intervals and provides coda files for MCMC convergence diagnostics
  - 'cext'
@@ -143,7 +143,7 @@ COMPILING
 --------------------------
 DESCRIPTION
 
-	'tspe' computes the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	'tspe' computes the divergence time distributions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
 
 
 --------------------------
@@ -156,12 +156,12 @@ MANUAL
 --------------------------
 
 NAME
-	tspe - Computation of the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	tspe - Computation of the divergence time distributions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
 SYNOPSIS
 	tspe [OPTIONS] <input Tree File> <input Fossil File> [output File]
 
 DESCRIPTION
-	Compute the divergence time distibutions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
+	Compute the divergence time distributions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
 
 	Options are
 	-z <input Tree File>
@@ -224,7 +224,7 @@ COMPILING
 --------------------------
 DESCRIPTION
 
-	'dext' computes the extinction time distibution associated to given sets of taxa from a set of possible trees, the fossil ages
+	'dext' computes the extinction time distibution associated to given sets of clades from a set of possible trees, the fossil ages
 
 
 --------------------------
@@ -305,7 +305,7 @@ COMPILING
 --------------------------
 DESCRIPTION
 
-	'text' computes the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	'text' computes the extinction time distributions associated to all the terminal nodes of a single tree with the fossil ages and draw a tree figure
 
 
 --------------------------
@@ -318,12 +318,12 @@ MANUAL
 --------------------------
 
 NAME
-	text - Computation of the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	text - Computation of the divergence time distributions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
 SYNOPSIS
 	text [OPTIONS] <input Tree File> <input Fossil File> [output File]
 
 DESCRIPTION
-	Compute the divergence time distibutions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
+	Compute the divergence time distributions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
 
 	Options are
 	-z <input Tree File>
@@ -386,7 +386,7 @@ COMPILING
 --------------------------
 DESCRIPTION
 
-	'qext' computes the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	'qext' computes the quantile at a given order, of extinction time distibution associated to a given set of clades from a set of possible trees, the fossil stratigraphic intervals and provides coda files for MCMC convergence diagnostics
 
 
 --------------------------
@@ -399,12 +399,12 @@ MANUAL
 --------------------------
 
 NAME
-	qext - Computation of the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	qext - Computation of the divergence time distributions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
 SYNOPSIS
 	qext [OPTIONS] <input Tree File> <input Fossil File> [output File]
 
 DESCRIPTION
-	Compute the divergence time distibutions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
+	Compute the divergence time distributions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
 
 	Options are
 	-z <input Tree File>
@@ -459,7 +459,7 @@ COMPILING
 --------------------------
 DESCRIPTION
 
-	'cext' computes the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	'cext' computes the probability that a set of extinct taxa goes extinct before another one from a set of possible trees, the fossil stratigraphic intervals and provides coda files for MCMC convergence diagnostics
 
 
 --------------------------
@@ -472,12 +472,12 @@ MANUAL
 --------------------------
 
 NAME
-	cext - Computation of the divergence time distibutions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	cext - Computation of the divergence time distributions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
 SYNOPSIS
 	cext [OPTIONS] <input Tree File> <input Fossil File> [output File]
 
 DESCRIPTION
-	Compute the divergence time distibutions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
+	Compute the divergence time distributions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
 
 	Options are
 	-z <input Tree File>
