@@ -1,5 +1,5 @@
 # DateFBD
-Divergence time distribution from fossil ages and topologies
+Divergence and extinction time distribution from fossil ages and topologies
 
 Software includes
  - 'dspe'
