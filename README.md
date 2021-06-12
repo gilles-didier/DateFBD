@@ -37,7 +37,7 @@ type
 
 Directory "src" contains the C sources of the standalone software
 
-Archive file "rfbd_0.0.tar.gz" contains the R package 'rfdb', including source files and manual
+Archive file "rfbd_0.1.tar.gz" contains the R package 'rfdb', including source files and manual
 
 Directory "data" contains two subdirectories
 	'Speciation' contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
@@ -351,6 +351,8 @@ DESCRIPTION
 		set the number of samples required
 	-d
 		return the distribution (otherwise the density is returned by default)
+	-y <width>
+		set the width of the figure
 	-u <value>
 		set the step discretizing the time distribution to <value>
 	-n <number>
@@ -430,18 +432,16 @@ DESCRIPTION
 		set the relation proportion of moves in the speciation and the extinction rates (thus in the fossilization rate)
 	-s <number>
 		set the number of samples required
-	-d
-		return the distribution (otherwise the density is returned by default)
-	-u <value>
-		set the step discretizing the time distribution to <value>
-	-n <number>
-		compute the divergence distribution associated to node <number>; option can be used several times; if it is not used all the divergence times are computed; the number of each node can be found by using the option -z or the prgram 'draw' with option -d
+	-n <taxa name>
+		add the taxa to the list of taxa whose upper bound has to be computed
+	-c <file name>
+		add the clade made of the taxa listed in the file to the list of clades whose  whose upper bound has to be computed
 	-h
 		display help
 
 EXAMPLE
 
-./cext -o -400 -s 1000 -b 10000 -g 200 -f 0.2 -a 0.33 0.33 -w 0.5 0.5 0.5 -i 5. 5. 5. -t 1 -m -230 -u 0.05 ~/Dropbox/Extinction/dev/data/Sphenacodontidae ~/Dropbox/Extinction/dev/data/Ophiacodontidae ~/Dropbox/Extinction/dev/data/Eupely.phy ~/Dropbox/Extinction/dev/data/CotylosauriaAges.csv
+./qext -o -400 -s 1000 -b 10000 -g 200 -f 0.2 -a 0.33 0.33 -w 0.5 0.5 0.5 -i 5. 5. 5. -t 1 -c ~/Dropbox/Extinction/dev/data/Sphenacodontidae -c ~/Dropbox/Extinction/dev/data/Ophiacodontidae ~/Dropbox/Extinction/dev/data/Eupely.phy ~/Dropbox/Extinction/dev/data/CotylosauriaAges.csv
 
 --------------------------
 
@@ -477,12 +477,12 @@ MANUAL
 --------------------------
 
 NAME
-	cext - Computation of the divergence time distributions associated to a given set of nodes from a single tree, the fossil ages, and the diversification rates and draw a tree figure
+	cext - Computation of the probability that a set of extinct taxa goes extinct before another one from a set of trees and the fossil stratigraphic intervals
 SYNOPSIS
-	cext [OPTIONS] <input Tree File> <input Fossil File> [output File]
+	cext [OPTIONS] <set of taxa 1> <set of taxa 2> <input Tree File> <input Fossil File>
 
 DESCRIPTION
-	Compute the divergence time distributions associated to a given set of nodes from the tree of <input Tree File>, the fossil ages of <input Fossil File>, and the diversification rates and draw a tree figure
+	Compute the probability that the set <set of taxa 1> goes extinct before <set of taxa 2> from the trees of <input Tree File>, the fossil ages of <input Fossil File> and draw a tree figure
 
 	Options are
 	-z <input Tree File>
@@ -503,12 +503,6 @@ DESCRIPTION
 		set the relation proportion of moves in the speciation and the extinction rates (thus in the fossilization rate)
 	-s <number>
 		set the number of samples required
-	-d
-		return the distribution (otherwise the density is returned by default)
-	-u <value>
-		set the step discretizing the time distribution to <value>
-	-n <number>
-		compute the divergence distribution associated to node <number>; option can be used several times; if it is not used all the divergence times are computed; the number of each node can be found by using the option -z or the prgram 'draw' with option -d
 	-h
 		display help
 
