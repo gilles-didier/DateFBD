@@ -69,7 +69,7 @@ void drawFossilDensity(int n, double x, double y, TypeInfoDrawTreeGeneric *info,
 int main(int argc, char **argv) {	
 	char *inputFileNameTree, *inputFileNameFossil = NULL, *outputPrefix = PREFIX, outputDistribution[STRING_SIZE], option[256], format = '1';
 	FILE *fi, *fo;
-	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, node = NOSUCH, maxT = 2, *todo, tab_todo[MAX_NODE], nTodo=0;
+	int i, j, nSamp = 100, nBurn = 1000, nGap = 10, node = NOSUCH, maxT = 2, *todo, tab_todo[MAX_NODE], nTodo=0, outDens=1;
 	double minTimeIntInf = NO_TIME, minTimeIntSup = NO_TIME, maxTimeIntInf = 0., maxTimeIntSup = 0., step = 0.1, treeScaleStep=10., al = 0.75, prop = 0.25, probSpe = 0.33, probExt = 0.33, maxDisplayTime = 0., figwidth = 100.;
 	TypeModelParam param = {.birth=1.3, .death = 1., .fossil = 1., .sampling = 1.}, windSize = {.birth=0.1, .death = 0.1, .fossil = 0.02, .sampling = 1.}, init = {.birth=0.5, .death = 0.5, .fossil = 0.1, .sampling = 1.};
 
@@ -240,10 +240,7 @@ int main(int argc, char **argv) {
 		}
 		if(option['d']) {
 			option['d'] = 0;
-			if((i+1)<argc && sscanf(argv[i+1], "%lf", &(step)) == 1)
-				i++;
-			else
-				error("a number is expected after -d");
+			outDens = 0;
 		}
 		if(option['m']) {
 			option['m'] = 0;
@@ -328,11 +325,9 @@ int main(int argc, char **argv) {
 			}
 		} else
 			fos = fosToFossilInt(tree);
-printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 		if(getMaxFossilIntTime(fos) > 0.)
 			negateFossilInt(fos);
 		fixStatus(tree, fos);
-//fprintTreeFossilInt(stdout, tree, fos);
 		if(nTodo>0)
 			todo = tab_todo;
 		else {
@@ -341,7 +336,6 @@ printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 			for(n=0; n<tree->size; n++)
 				if(tree->node[n].child == NOSUCH && fos->status[n] == extinctNodeStatus) {
 					todo[nTodo++] = n;
-//printf("leaf %d %s\n", n, tree->name[n]);
 				}
 		}
 		todo[nTodo] = NOSUCH;
@@ -385,10 +379,13 @@ printf("Fossil %d %s\n", fos->sizeFossil, inputFileNameFossil);
 			else
 				sprintf(outputDistribution, "%s_%d.csv", outputPrefix, todo[n]);
 			if((fo = fopen(outputDistribution, "w"))) {
-				fprintDistribution(fo, d[todo[n]]);
+				if(outDens) {
+					deriveDistribution(&(d[todo[n]]));
+					fprintDistribution(fo, d[todo[n]]);
+				} else
+					fprintDistribution(fo, d[todo[n]]);
 				fclose(fo);
 			}
-			printf("sum %s %lf\t%lf\t%lf\n", tree->name[todo[n]], sumDistribution(d[todo[n]]), sumTrapezeDistribution(d[todo[n]]), sumSimpsonDistribution(d[todo[n]]));
 		}
 		if(tree->name[todo[0]] != NULL)
 			fprintf(stdout,"\nplot '%s_%s.csv' using 1:2 with lines title '%s' lw 3", outputPrefix, tree->name[todo[0]], tree->name[todo[0]]);
