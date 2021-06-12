@@ -39,10 +39,15 @@ Directory "src" contains the C sources of the standalone software
 
 Archive file "rfbd_0.0.tar.gz" contains the R package 'rfdb', including source files and manual
 
-Directory "data" contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
-	'CotylosauriaTree.phy' contains 100 equiparsimonious trees of Cotylosauria
-	'CotylosauriaAges.csv' contains the fossil ages
-	'Optimisation_Parameters' are the parameters of the numerical optimisation used for determining the speciation, extinction and fossilization rates
+Directory "data" contains two subdirectories
+	'Speciation' contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
+		'CotylosauriaTree.phy' contains 100 equiparsimonious trees of Cotylosauria
+		'CotylosauriaAges.csv' contains the fossil ages
+		'Optimisation_Parameters' are the parameters of the numerical optimisation used for determining the speciation, extinction and fossilization rates
+	'Extinction' contains the dataset studied in "Distributions of extinction times from fossil ages and tree topologies: the example of some mid-Permian synapsid extinctions":
+		'TreeEupely100.phy' contains 100 equiparsimonious trees of Eupelicosauria
+		'FossilAges.csv' contains the fossil ages
+		'Edaphosauridae', 'Ophiacodontidae' and 'Sphenacodontidae' contain the so-called clades
 
 
 A complete description of the options of the programs is given below.
@@ -281,7 +286,7 @@ DESCRIPTION
 
 EXAMPLE
 
-./dext -o -400 -s 2000 -u 0.1 -b 10000 -g 300 -r 5555 -f 0.25 -a 0.33 0.33 -w 0.1 0.1 0.01 -i 5. 5. 5. -t 40 Amniota.txt CotylosauriaTree.phy CotylosauriaAges.csv amniota2000_400
+./dext -o -400 -s 300 -b 10000 -g 200 -f 0.2 -a 0.33 0.33 -w 0.5 0.5 0.5 -i 5. 5. 5. -t 1 -m -230 -u 0.05 -c ../data/Ophiacodontidae -c ../data/Edaphosauridae -c ../data/Sphenacodontidae ~/Dropbox/Extinction/dev/data/Eupely100.phy ~/Dropbox/Extinction/dev/data/CotylosauriaAges.csv dist
 
 
 --------------------------
@@ -363,7 +368,7 @@ DESCRIPTION
 
 EXAMPLE
 
-./text -o -400 -s 2000 -b 10000 -g 300 -f 0.25 -a 0.33 0.33 -w 0.1 0.1 0.01 -i 5. 5. 5. -t 40 -x 6 -n 0 -n 1 -n 2  -n 5 -n 7 -n 24 -n 25 -n 26 -n 27 -n 32 -n 67 -n 68 -n 103 -n 104 -n 129 -n 130 -n 147 -n 202 -n 203 -n 204 -n 208 -n 209 -n 236 -n 237 -n 276 CotylosauriaTree.phy CotylosauriaAges.csv distribution
+./text -o -400 -s 100 -b 100 -g 1 -f 0.5 -a 0.33 0.33 -w 0.5 0.5 0.5 -i 5. 5. 5. -t 1 -m -230 -u 1 -y 500 -x 6 ~/Dropbox/Extinction/dev/data/Eupely10.phy ~/Dropbox/Extinction/dev/data/CotylosauriaAgesNew.csv tree
 
 --------------------------
 
@@ -441,7 +446,7 @@ EXAMPLE
 --------------------------
 
 -------
- qext 
+ cext 
 -------
 
 --------------------------
