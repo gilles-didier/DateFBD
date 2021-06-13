@@ -40,10 +40,14 @@ Directory "src" contains the C sources of the standalone software
 Archive file "rfbd_0.1.tar.gz" contains the R package 'rfdb', including source files and manual
 
 Directory "data" contains two subdirectories:
- - 'Speciation' contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
-  - 'CotylosauriaTree.phy' contains 100 equiparsimonious trees of Cotylosauria
-  - 'CotylosauriaAges.csv' contains the fossil ages
-  - 'Optimisation_Parameters' are the parameters of the numerical optimisation used for determining the speciation, extinction and fossilization rates
+ - 'Speciation'
+   contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
+    - 'CotylosauriaTree.phy'
+      contains 100 equiparsimonious trees of Cotylosauria
+	- 'CotylosauriaAges.csv'
+	   contains the fossil ages
+    - 'Optimisation_Parameters'
+       are the parameters of the numerical optimisation used for determining the speciation, extinction and fossilization rates
  - 'Extinction' contains the dataset studied in "Distributions of extinction times from fossil ages and tree topologies: the example of some mid-Permian synapsid extinctions":
   - 'TreeEupely100.phy' contains 100 equiparsimonious trees of Eupelicosauria
   - 'FossilAges.csv' contains the fossil ages
