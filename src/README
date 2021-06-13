@@ -50,10 +50,11 @@ Directory "data" contains two subdirectories:
 	   contains the fossil ages
     - 'Optimisation_Parameters'
        are the parameters of the numerical optimisation used for determining the speciation, extinction and fossilization rates
- - 'Extinction' contains the dataset studied in "Distributions of extinction times from fossil ages and tree topologies: the example of some mid-Permian synapsid extinctions":
-  - 'TreeEupely100.phy' contains 100 equiparsimonious trees of Eupelicosauria
-  - 'FossilAges.csv' contains the fossil ages
-  - 'Edaphosauridae', 'Ophiacodontidae' and 'Sphenacodontidae' contain the so-called clades
+ - 'Extinction'
+    contains the dataset studied in "Distributions of extinction times from fossil ages and tree topologies: the example of some mid-Permian synapsid extinctions":
+      - 'TreeEupely100.phy' contains 100 equiparsimonious trees of Eupelicosauria
+      - 'FossilAges.csv' contains the fossil ages
+      - 'Edaphosauridae', 'Ophiacodontidae' and 'Sphenacodontidae' contain the so-called clades
 
 
 A complete description of the options of the programs is given below.
