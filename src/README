@@ -39,7 +39,7 @@ Directory "src" contains the C sources of the standalone software
 
 Archive file "rfbd_0.1.tar.gz" contains the R package 'rfdb', including source files and manual
 
-Directory "data" contains two subdirectories
+Directory "data" contains two subdirectories:
 	- 'Speciation' contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
 		- 'CotylosauriaTree.phy' contains 100 equiparsimonious trees of Cotylosauria
 		- 'CotylosauriaAges.csv' contains the fossil ages
