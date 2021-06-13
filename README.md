@@ -26,10 +26,12 @@ Software includes
 	implements 'dspe', 'dext', 'qext', 'cext' and 'diag' in the R environment (some features of the standalone software such as the multithreading are not available yet)
 
 type
+
 	> make all
 	in a console opened on the src directory for compiling standalone software.
 	
-type	
+type
+
 	> install.packages("<path to>/rfbd_0.0.tar.gz", repos = NULL, type = "source")
 
 	> library(rfbd)
@@ -39,15 +41,19 @@ Directory "src" contains the C sources of the standalone software
 
 Archive file "rfbd_0.1.tar.gz" contains the R package 'rfdb', including source files and manual
 
-Directory "data" contains two subdirectories
-	- 'Speciation' contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
-		- 'CotylosauriaTree.phy' contains 100 equiparsimonious trees of Cotylosauria
-		- 'CotylosauriaAges.csv' contains the fossil ages
-		- 'Optimisation_Parameters' are the parameters of the numerical optimisation used for determining the speciation, extinction and fossilization rates
-	- 'Extinction' contains the dataset studied in "Distributions of extinction times from fossil ages and tree topologies: the example of some mid-Permian synapsid extinctions":
-		- 'TreeEupely100.phy' contains 100 equiparsimonious trees of Eupelicosauria
-		- 'FossilAges.csv' contains the fossil ages
-		- 'Edaphosauridae', 'Ophiacodontidae' and 'Sphenacodontidae' contain the so-called clades
+Directory "data" contains two subdirectories:
+ - 'Speciation'
+   contains the dataset studied in "Exact distribution of divergence times from fossil ages and topologies":
+    - 'CotylosauriaTree.phy'
+      contains 100 equiparsimonious trees of Cotylosauria
+	- 'CotylosauriaAges.csv'
+	   contains the fossil ages
+    - 'Optimisation_Parameters'
+       are the parameters of the numerical optimisation used for determining the speciation, extinction and fossilization rates
+ - 'Extinction' contains the dataset studied in "Distributions of extinction times from fossil ages and tree topologies: the example of some mid-Permian synapsid extinctions":
+  - 'TreeEupely100.phy' contains 100 equiparsimonious trees of Eupelicosauria
+  - 'FossilAges.csv' contains the fossil ages
+  - 'Edaphosauridae', 'Ophiacodontidae' and 'Sphenacodontidae' contain the so-called clades
 
 
 A complete description of the options of the programs is given below.
